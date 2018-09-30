@@ -1,0 +1,17 @@
+version: 2
+jobs:
+  build:
+    machine: true
+    environment:
+      - AWS_ECR_REPOSITORY: 564677439943.dkr.ecr.ap-northeast-1.amazonaws.com/h3poteto/pleroma
+    steps:
+      - checkout
+      - run:
+          name: Docker build
+          command: |
+            docker build -t $AWS_ECR_REPOSITORY:$CIRCLE_SHA1 .
+      - run:
+          name: Docker push
+          command: |
+            $(aws ecr get-login --no-include-email --region ap-northeast-1)
+            docker push $AWS_ECR_REPOSITORY:$CIRCLE_SHA1

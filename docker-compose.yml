@@ -1,0 +1,26 @@
+version: "3.0"
+services:
+  elixir:
+    image: h3poteto/phoenix:1.7.3
+    working_dir: /var/opt/app
+    environment:
+      MIX_ENV: dev
+    volumes:
+      - .:/var/opt/app
+    ports:
+      - "4000:4000"
+    links:
+      - db:db
+
+  db:
+    image: postgres:10-alpine
+    environment:
+      POSTGRES_USER: pleroma
+      POSTGRES_PASSWORD: pleroma
+      POSTGRES_DB: pleroma_dev
+    volumes:
+      - storage:/var/lib/postgres/data
+      - ./config:/var/opt/pleroma/config
+
+volumes:
+  storage:
