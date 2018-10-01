@@ -16,6 +16,6 @@ RUN mix local.hex --force && \
 
 EXPOSE 4000:4000
 
-ENTRYPOINT ["./entrypoint.sh"]
+ENTRYPOINT ["./dockerfiles/phoenix/entrypoint.sh"]
 
 CMD ["mix", "phx.server"]

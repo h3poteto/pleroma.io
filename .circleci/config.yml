@@ -3,15 +3,26 @@ jobs:
   build:
     machine: true
     environment:
-      - AWS_ECR_REPOSITORY: 564677439943.dkr.ecr.ap-northeast-1.amazonaws.com/h3poteto/pleroma
+      - PHOENIX_ECR: 564677439943.dkr.ecr.ap-northeast-1.amazonaws.com/h3poteto/pleroma/phoenix
+      - NGINX_ECR: 564677439943.dkr.ecr.ap-northeast-1.amazonaws.com/h3poteto/pleroma/nginx
     steps:
       - checkout
       - run:
-          name: Docker build
+          name: phoenix docker build
           command: |
-            docker build -t $AWS_ECR_REPOSITORY:$CIRCLE_SHA1 .
+            docker build -t $PHOENIX_ECR:$CIRCLE_SHA1 -f dockerfiles/phoenix/Dockerfile .
       - run:
-          name: Docker push
+          name: phoenix docker push
           command: |
             $(aws ecr get-login --no-include-email --region ap-northeast-1)
-            docker push $AWS_ECR_REPOSITORY:$CIRCLE_SHA1
+            docker push $PHOENIX_ECR:$CIRCLE_SHA1
+      - run:
+          name: nginx docker build
+          command: |
+            cd dockerfiles/nginx
+            docker build -t $NGINX_ECR:latest .
+      - run:
+          name: nginx docker push
+          command: |
+            $(aws ecr get-login --no-include-email --region ap-northeast-1)
+            docker push $NGINX_ECR:latest
