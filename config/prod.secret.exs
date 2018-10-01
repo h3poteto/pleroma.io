@@ -30,7 +30,7 @@ config :pleroma, Pleroma.Repo,
 
 config :pleroma, Pleroma.Uploaders.S3,
   bucket: System.get_env("S3_BUCKET"),
-  public_endpoint: "https://s3.amazonaws.com"
+  public_endpoint: "https://s3-ap-northeast-1.amazonaws.com"
 
 config :ex_aws, :s3,
   access_key_id: [{:system, "AWS_ACCESS_KEY_ID"}, :instance_role],
