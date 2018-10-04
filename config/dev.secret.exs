@@ -7,3 +7,11 @@ config :pleroma, Pleroma.Repo,
   database: "pleroma_dev",
   hostname: "db",
   pool_size: 10
+
+
+config :pleroma, :instance,
+  name: "Pleroma.io",
+  email: "h3.poteto@gmail.com",
+  limit: 5000,
+  registrations_open: true,
+  dedupe_media: false

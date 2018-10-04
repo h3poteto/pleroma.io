@@ -14,7 +14,7 @@ config :pleroma, :media_proxy,
   #base_url: "https://cache.pleroma.io"
 
 config :pleroma, :instance,
-  name: "Pleroma/io",
+  name: "Pleroma.io",
   email: "h3.poteto@gmail.com",
   limit: 5000,
   registrations_open: false,
