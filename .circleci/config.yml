@@ -1,6 +1,58 @@
 version: 2
 jobs:
   build:
+    docker:
+      - image: h3poteto/phoenix:1.7.3
+        environment:
+          MIX_ENV: test
+          DB_HOST: 127.0.0.1
+      - image: postgres:10-alpine
+        environment:
+          POSTGRES_USER: pleroma
+          POSTGRES_PASSWORD: pleroma
+          POSTGRES_DB: pleroma_test
+    working_directory: /var/opt/app
+    steps:
+      - checkout
+      - restore_cache:
+          name: Restoring cache - deps
+          keys:
+            - vendor-{{ checksum "mix.exs" }}-{{ checksum "mix.lock" }}
+            - vendor-{{ checksum "mix.exs" }}-
+      - restore_cache:
+          name: Restoring cache - _build
+          keys:
+            - _build-{{ checksum "mix.exs" }}-{{ checksum "mix.lock" }}
+            - _build-{{ checksum "mix.exs" }}
+      - run:
+          name: Mix packages install
+          command: mix deps.get
+      - save_cache:
+          name: Saving cache - deps
+          key: deps-{{ checksum "mix.exs" }}-{{ checksum "mix.lock" }}
+          paths:
+            - "deps"
+      - run:
+          name: Compile deps packages
+          command: |
+            mix local.hex --force
+            mix local.rebar --force
+            mix deps.compile
+      - save_cache:
+          name: Saving cache - _build
+          key: _build-{{ checksum "mix.exs" }}-{{ checksum "mix.lock" }}
+          paths:
+            - "_build"
+      - run:
+          name: Migration database
+          command: |
+            mix ecto.create
+            mix ecto.migrate
+      - run:
+          name: test
+          command: mix test
+
+  deploy:
     machine: true
     environment:
       - PHOENIX_ECR: 564677439943.dkr.ecr.ap-northeast-1.amazonaws.com/h3poteto/pleroma/phoenix
