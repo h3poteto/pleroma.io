@@ -41,3 +41,6 @@ config :ex_aws, :s3,
 config :pleroma, Pleroma.Upload,
   uploader: Pleroma.Uploaders.S3,
   strip_exif: false
+
+config :pleroma, :chat,
+  enabled: false
