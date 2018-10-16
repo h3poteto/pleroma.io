@@ -28,3 +28,8 @@ f_33b00b, /emoji/f_33b00b.png
 f_33b22b, /emoji/f_33b22b.png
 f_33h, /emoji/f_33h.png
 f_33t, /emoji/f_33t.png
+emacs, /emoji/custom/emacs.svg
+vim, /emoji/custom/vim.png
+vscode, /emoji/custom/vscode.png
+sublime_text, /emoji/custom/sublime_text.png
+atom, /emoji/custom/atom.png
