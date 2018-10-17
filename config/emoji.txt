@@ -33,3 +33,12 @@ vim, /emoji/custom/vim.png
 vscode, /emoji/custom/vscode.png
 sublime_text, /emoji/custom/sublime_text.png
 atom, /emoji/custom/atom.png
+ruby, /emoji/custom/ruby.png
+golang, /emoji/custom/golang.png
+python, /emoji/custom/python.png
+elixir, /emoji/custom/elixir.svg
+scala, /emoji/custom/scala.svg
+java, /emoji/custom/java.png
+swift, /emoji/custom/swift.png
+rust, /emoji/custom/rust.png
+haskell, /emoji/custom/haskell.svg
