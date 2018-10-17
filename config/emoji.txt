@@ -45,6 +45,13 @@ haskell, /emoji/custom/haskell.svg
 electron, /emoji/custom/electron.png
 react, /emoji/custom/react.svg
 vue, /emoji/custom/vue.svg
-fluentd, /emoji/custom/fluentd.svg
+fluentd, /emoji/custom/fluentd.png
 rails, /emoji/custom/rails.svg
 phoenix, /emoji/custom/phoenix.svg
+aws, /emoji/custom/aws.png
+mastodon, /emoji/custom/mastodon.png
+pleroma, /emoji/custom/pleroma.png
+twitter, /emoji/custom/twitter.png
+docker, /emoji/custom/docker.png
+github, /emoji/custom/github.png
+octcat, /emoji/custom/octcat.png
