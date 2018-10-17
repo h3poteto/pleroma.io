@@ -42,3 +42,9 @@ java, /emoji/custom/java.png
 swift, /emoji/custom/swift.png
 rust, /emoji/custom/rust.png
 haskell, /emoji/custom/haskell.svg
+electron, /emoji/custom/electron.png
+react, /emoji/custom/react.svg
+vue, /emoji/custom/vue.svg
+fluentd, /emoji/custom/fluentd.svg
+rails, /emoji/custom/rails.svg
+phoenix, /emoji/custom/phoenix.svg
