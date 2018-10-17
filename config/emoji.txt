@@ -55,3 +55,10 @@ twitter, /emoji/custom/twitter.png
 docker, /emoji/custom/docker.png
 github, /emoji/custom/github.png
 octcat, /emoji/custom/octcat.png
+linux, /emoji/custom/linux.png
+ubuntu, /emoji/custom/ubuntu.png
+centos, /emoji/custom/centos.png
+arch_linux, /emoji/custom/arch_linux.png
+gentoo, /emoji/custom/gentoo.png
+mac, /emoji/custom/mac.png
+windows, /emoji/custom/windows.png
