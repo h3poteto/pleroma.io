@@ -16,6 +16,8 @@ config :pleroma, :instance,
   registrations_open: true,
   dedupe_media: false
 
+config :pleroma, :chat,
+  enabled: false
 
 config :pleroma, :fe,
   scope_options_enabled: true
