@@ -15,3 +15,7 @@ config :pleroma, :instance,
   limit: 5000,
   registrations_open: true,
   dedupe_media: false
+
+
+config :pleroma, :fe,
+  scope_options_enabled: true

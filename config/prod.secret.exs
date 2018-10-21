@@ -44,3 +44,6 @@ config :pleroma, Pleroma.Upload,
 
 config :pleroma, :chat,
   enabled: false
+
+config :pleroma, :fe,
+  scope_options_enabled: true
