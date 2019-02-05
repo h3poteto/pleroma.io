@@ -1,3 +1,6 @@
 FROM  nginx:1.15-alpine
 
-ADD ./nginx.conf /etc/nginx/nginx.conf
+ADD ./entrypoint.sh /var/opt/entrypoint.sh
+ADD ./nginx.conf /etc/nginx/nginx.conf.tpl
+
+ENTRYPOINT ["/var/opt/entrypoint.sh"]
