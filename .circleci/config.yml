@@ -102,7 +102,7 @@ jobs:
       - run:
           name: deploy
           command: |
-            kubectl patch -f k8s-services/pleroma/deployment.yml -p "{\"spec\":{\"template\":{\"spec\":{\"containers\":[{\"name\":\"go\",\"image\":\"${AWS_ECR_REPOSITORY}:${CIRCLE_SHA1}\"}]}}}}"
+            kubectl patch -f k8s-services/pleromaio/deployment.yml -p "{\"spec\":{\"template\":{\"spec\":{\"containers\":[{\"name\":\"phoenix\",\"image\":\"${AWS_ECR_REPOSITORY}:${CIRCLE_SHA1}\"}]}}}}"
 
 
 
