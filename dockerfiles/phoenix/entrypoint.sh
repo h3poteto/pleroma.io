@@ -1,6 +1,13 @@
 #!/bin/bash
 
 export AWS_DEFAULT_REGION=ap-northeast-1
+
+myaws ssm parameter get pleroma.$SERVICE_ENV.db_host --region $AWS_DEFAULT_REGION
+ret=$?
+if [[ $ret -ne 0 ]]; then
+    exit
+fi
+
 export RELX_REPLACE_OS_VARS=true
 export SECRET_KEY_BASE=`myaws ssm parameter get pleroma.$SERVICE_ENV.secret_key_base --region $AWS_DEFAULT_REGION`
 export DB_USER=`myaws ssm parameter get pleroma.$SERVICE_ENV.db_user --region $AWS_DEFAULT_REGION`
