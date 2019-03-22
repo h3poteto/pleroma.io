@@ -8,12 +8,6 @@ config :pleroma, Pleroma.Web.Endpoint,
   server: true,
   secret_key_base: System.get_env("SECRET_KEY_BASE")
 
-config :logger, SlackLogger,
-  level: :error,
-  hook_url: {:system, "SLACK_WEBHOOK_URL"},
-  channel: "#pleroma",
-  username: "pleroma"
-
 config :pleroma, :media_proxy,
   enabled: true,
   redirect_on_failure: true
@@ -68,3 +62,7 @@ config :web_push_encryption, :vapid_details,
       subject: "mailto:h3.poteto@gmail.com",
       public_key: System.get_env("WEB_PUSH_PUBLIC_KEY"),
       private_key: System.get_env("WEB_PUSH_PRIVATE_KEY")
+
+config :quack, webhook_url: System.get_env("SLACK_WEBHOOK_URL")
+config :logger, backends: [:console, Quack.Logger]
+config :quack, level: :error

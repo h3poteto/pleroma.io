@@ -16,7 +16,7 @@ export DB_PASSWORD=`myaws ssm parameter get pleroma.$SERVICE_ENV.db_password --r
 export DB_NAME=`myaws ssm parameter get pleroma.$SERVICE_ENV.db_name --region $AWS_DEFAULT_REGION`
 export DB_HOST=`myaws ssm parameter get pleroma.$SERVICE_ENV.db_host --region $AWS_DEFAULT_REGION`
 export S3_BUCKET=`myaws ssm parameter get pleroma.$SERVICE_ENV.s3_bucket --region $AWS_DEFAULT_REGION`
-export WEB_PUSH_PUBLIC_KEY=`myaws ssm parameter get pleroma.$SERIVCE_ENV.web_push_public_key --region $AWS_DEFAULT_REGION`
+export WEB_PUSH_PUBLIC_KEY=`myaws ssm parameter get pleroma.$SERVICE_ENV.web_push_public_key --region $AWS_DEFAULT_REGION`
 export WEB_PUSH_PRIVATE_KEY=`myaws ssm parameter get pleroma.$SERVICE_ENV.web_push_private_key --region $AWS_DEFAULT_REGION`
 
 exec "$@"
