@@ -65,6 +65,6 @@ config :pleroma, :suggestions,
   web: "https://vinayaka.distsn.org/?{{host}}+{{user}}"
 
 config :web_push_encryption, :vapid_details,
-  subject: "mailto:h3.poteto@gmail.com",
-  public_key: System.get_env("WEB_PUSH_PUBLIC_KEY")
-  private_key: System.get_env("WEB_PUSH_PRIVATE_KEY")
+      subject: "mailto:h3.poteto@gmail.com",
+      public_key: System.get_env("WEB_PUSH_PUBLIC_KEY"),
+      private_key: System.get_env("WEB_PUSH_PRIVATE_KEY")
