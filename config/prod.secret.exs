@@ -17,7 +17,7 @@ config :pleroma, :instance,
   name: "Pleroma.io",
   email: "h3.poteto@gmail.com",
   limit: 5000,
-  registrations_open: true,
+  registrations_open: false,
   dedupe_media: false
 
 config :pleroma, Pleroma.Repo,
