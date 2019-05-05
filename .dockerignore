@@ -1,6 +1,10 @@
+.circleci
+.git
+*.dump
 _build
 deps
+docs
 installation
 test
-uploads/*
+uploads
 
