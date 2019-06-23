@@ -48,8 +48,10 @@ config :pleroma, Pleroma.Upload,
 config :pleroma, :chat,
   enabled: false
 
-config :pleroma, :fe,
-  scope_options_enabled: true
+config :pleroma, :frontend_configurations,
+  pleroma_fe: %{
+    scope_options_enabled: true
+  }
 
 config :pleroma, :suggestions,
   enabled: true,
