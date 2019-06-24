@@ -13,7 +13,7 @@ services:
       - db:db
 
   db:
-    image: postgres:10-alpine
+    image: postgres:11.2-alpine
     environment:
       POSTGRES_USER: pleroma
       POSTGRES_PASSWORD: pleroma

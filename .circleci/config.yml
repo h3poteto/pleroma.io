@@ -6,7 +6,10 @@ jobs:
         environment:
           MIX_ENV: test
           DB_HOST: 127.0.0.1
-      - image: postgres:10-alpine
+          DB_USER: pleroma
+          DB_PASSWORD: pleroma
+          DB_NAME: pleroma_test
+      - image: postgres:11.2-alpine
         environment:
           POSTGRES_USER: pleroma
           POSTGRES_PASSWORD: pleroma
