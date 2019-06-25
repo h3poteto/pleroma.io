@@ -1,4 +1,4 @@
-FROM h3poteto/phoenix:1.7.3
+FROM h3poteto/phoenix:1.8.2
 
 USER root
 ENV APP_DIR /var/opt/app

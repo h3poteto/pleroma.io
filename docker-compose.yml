@@ -1,7 +1,7 @@
 version: "3.0"
 services:
   elixir:
-    image: h3poteto/phoenix:1.7.3
+    image: h3poteto/phoenix:1.8.2
     working_dir: /var/opt/app
     environment:
       MIX_ENV: dev

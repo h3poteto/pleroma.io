@@ -2,7 +2,7 @@ version: 2
 jobs:
   build:
     docker:
-      - image: h3poteto/phoenix:1.7.3
+      - image: h3poteto/phoenix:1.8.2
         environment:
           MIX_ENV: test
           DB_HOST: 127.0.0.1
