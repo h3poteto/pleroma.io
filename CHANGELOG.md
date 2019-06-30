@@ -13,7 +13,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Not being able to access the Mastodon FE login page on private instances
 - MRF: ensure that subdomain_match calls are case-insensitive
 - Fix internal server error when using the healthcheck API.
-- `federation_incoming_replies_max_depth` option being ignored in certain cases.
 
 ### Added
 - **Breaking:** MRF describe API, which adds support for exposing configuration information about MRF policies to NodeInfo.
@@ -24,6 +23,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Support for wildcard domains in user domain blocks setting.
 - Configuration: `quarantined_instances` support wildcard domains.
 - Mix Tasks: `mix pleroma.database fix_likes_collections`
+- Federation: Support for restricting max. reply-to depth on fetching
 
 ### Removed
 - Federation: Remove `likes` from objects.
