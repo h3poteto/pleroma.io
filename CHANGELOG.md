@@ -10,7 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - MediaProxy: fix matching filenames
 - MediaProxy: fix filename encoding
 - Migrations: fix a sporadic migration failure
-- Metadata rendering crashes no longer result in 500 errors
+- Metadata rendering errors resulting in the entire page being inaccessible
 
 ## [1.0.1] - 2019-07-14
 ### Security
