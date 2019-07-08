@@ -12,6 +12,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Migrations: fix a sporadic migration failure
 - Metadata rendering errors resulting in the entire page being inaccessible
 
+### Changed
+- Configuration: OpenGraph and TwitterCard providers enabled by default
+- Configuration: Filter.AnonymizeFilename added ability to retain file extension with custom text
+
 ## [1.0.1] - 2019-07-14
 ### Security
 - OStatus: fix an object spoofing vulnerability.
