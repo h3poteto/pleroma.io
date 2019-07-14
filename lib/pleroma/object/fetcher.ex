@@ -39,7 +39,7 @@ defmodule Pleroma.Object.Fetcher do
              "object" => data
            },
            {:containment, :ok} <- {:containment, Containment.contain_origin(id, params)},
-           {:ok, activity} <- Transmogrifier.handle_incoming(params, options),
+           {:ok, activity} <- Transmogrifier.handle_incoming(params),
            {:object, _data, %Object{} = object} <-
              {:object, data, Object.normalize(activity, false)} do
         {:ok, object}
