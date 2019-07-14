@@ -841,7 +841,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/tesla_mock/https__info.pleroma.site_activity.json")
+       body: File.read!("test/fixtures/httpoison_mock/https__info.pleroma.site_activity.json")
      }}
   end
 
@@ -853,7 +853,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/tesla_mock/https__info.pleroma.site_activity2.json")
+       body: File.read!("test/fixtures/httpoison_mock/https__info.pleroma.site_activity2.json")
      }}
   end
 
@@ -865,7 +865,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/tesla_mock/https__info.pleroma.site_activity3.json")
+       body: File.read!("test/fixtures/httpoison_mock/https__info.pleroma.site_activity3.json")
      }}
   end
 

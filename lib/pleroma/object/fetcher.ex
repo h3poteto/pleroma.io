@@ -56,9 +56,9 @@ defmodule Pleroma.Object.Fetcher do
         {:normalize, object = %Object{}} ->
           {:ok, object}
 
-        e ->
+        _e ->
           # Only fallback when receiving a fetch/normalization error with ActivityPub
-          Logger.warn("Couldn't get object via AP, trying out OStatus fetching... #{inspect(e)}")
+          Logger.info("Couldn't get object via AP, trying out OStatus fetching...")
 
           # FIXME: OStatus Object Containment?
           case OStatus.fetch_activity_from_url(id) do
