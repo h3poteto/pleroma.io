@@ -3,6 +3,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.0.1] - 2019-07-14
+### Security
+- OStatus: fix an object spoofing vulnerability.
+
+### Added
+- MRF: Support for excluding specific domains from Transparency.
+
 ## [1.0.0] - 2019-06-29
 ### Security
 - Mastodon API: Fix display names not being sanitized
