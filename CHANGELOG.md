@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Migrations: fix a sporadic migration failure
 - Metadata rendering errors resulting in the entire page being inaccessible
 - Federation/MediaProxy not working with instances that have wrong certificate order
+- ActivityPub S2S: remote user deletions now work the same as local user deletions.
 
 ### Changed
 - Configuration: OpenGraph and TwitterCard providers enabled by default

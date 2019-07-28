@@ -614,7 +614,7 @@ defmodule Pleroma.Web.ActivityPub.Transmogrifier do
   # an error or a tombstone.  This would allow us to verify that a deletion actually took
   # place.
   def handle_incoming(
-        %{"type" => "Delete", "object" => object_id, "actor" => _actor, "id" => _id} = data
+        %{"type" => "Delete", "object" => object_id, "actor" => actor, "id" => _id} = data
       ) do
     object_id = Utils.get_ap_id(object_id)
 
@@ -625,7 +625,17 @@ defmodule Pleroma.Web.ActivityPub.Transmogrifier do
          {:ok, activity} <- ActivityPub.delete(object, false) do
       {:ok, activity}
     else
-      _e -> :error
+      nil ->
+        case User.get_cached_by_ap_id(object_id) do
+          %User{ap_id: ^actor} = user ->
+            User.delete(user)
+
+          nil ->
+            :error
+        end
+
+      _e ->
+        :error
     end
   end
 
