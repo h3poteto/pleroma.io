@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [1.0.2] - 2019-07-28
 ### Fixed
 - Not being able to pin unlisted posts
+- Mastodon API: represent poll IDs as strings
+- MediaProxy: fix matching filenames
+- MediaProxy: fix filename encoding
+- Migrations: fix a sporadic migration failure
 
 ## [1.0.1] - 2019-07-14
 ### Security
