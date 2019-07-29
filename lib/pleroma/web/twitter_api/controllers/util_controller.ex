@@ -13,7 +13,6 @@ defmodule Pleroma.Web.TwitterAPI.UtilController do
   alias Pleroma.Notification
   alias Pleroma.User
   alias Pleroma.Web
-  alias Pleroma.Web.ActivityPub.ActivityPub
   alias Pleroma.Web.CommonAPI
   alias Pleroma.Web.OStatus
   alias Pleroma.Web.WebFinger
@@ -98,8 +97,7 @@ defmodule Pleroma.Web.TwitterAPI.UtilController do
     with %User{} = user <- User.get_cached_by_nickname(username),
          true <- Pbkdf2.checkpw(password, user.password_hash),
          %User{} = _followed <- User.get_cached_by_id(id),
-         {:ok, follower} <- User.follow(user, followee),
-         {:ok, _activity} <- ActivityPub.follow(follower, followee) do
+         {:ok, _follower, _followee, _activity} <- CommonAPI.follow(user, followee) do
       conn
       |> render("followed.html", %{error: false})
     else
@@ -120,8 +118,7 @@ defmodule Pleroma.Web.TwitterAPI.UtilController do
 
   def do_remote_follow(%{assigns: %{user: user}} = conn, %{"user" => %{"id" => id}}) do
     with %User{} = followee <- User.get_cached_by_id(id),
-         {:ok, follower} <- User.follow(user, followee),
-         {:ok, _activity} <- ActivityPub.follow(follower, followee) do
+         {:ok, _follower, _followee, _activity} <- CommonAPI.follow(user, followee) do
       conn
       |> render("followed.html", %{error: false})
     else
