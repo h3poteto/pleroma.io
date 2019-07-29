@@ -207,7 +207,7 @@ certbot renew --cert-name yourinstance.tld --webroot -w /var/lib/letsencrypt/ --
 
 # Add it to the daily cron
 echo '#!/bin/sh
-certbot renew --cert-name yourinstance.tld --webroot -w /var/lib/letsencrypt/ --dry-run --post-hook "systemctl reload nginx"
+certbot renew --cert-name yourinstance.tld --webroot -w /var/lib/letsencrypt/ --post-hook "systemctl reload nginx"
 ' > /etc/cron.daily/renew-pleroma-cert
 chmod +x /etc/cron.daily/renew-pleroma-cert
 
@@ -228,7 +228,7 @@ certbot renew --cert-name yourinstance.tld --webroot -w /var/lib/letsencrypt/ --
 
 # Add it to the daily cron
 echo '#!/bin/sh
-certbot renew --cert-name yourinstance.tld --webroot -w /var/lib/letsencrypt/ --dry-run --post-hook "rc-service nginx reload"
+certbot renew --cert-name yourinstance.tld --webroot -w /var/lib/letsencrypt/ --post-hook "rc-service nginx reload"
 ' > /etc/periodic/daily/renew-pleroma-cert
 chmod +x /etc/periodic/daily/renew-pleroma-cert
 
@@ -242,6 +242,14 @@ So for example, if the task is `mix pleroma.user set admin --admin`, you should 
 ```sh
 su pleroma -s $SHELL -lc "./bin/pleroma_ctl user set admin --admin"
 ```
+
+## Create your first user and set as admin
+```sh
+cd /opt/pleroma/bin
+su pleroma -s $SHELL -lc "./bin/pleroma_ctl user new joeuser joeuser@sld.tld --admin"
+```
+This will create an account withe the username of 'joeuser' with the email address of joeuser@sld.tld, and set that user's account as an admin. This will result in a link that you can paste into the browser, which logs you in and enables you to set the password.
+
 ### Updating
 Generally, doing the following is enough:
 ```sh

@@ -194,6 +194,8 @@ config :pleroma, :http,
   send_user_agent: true,
   adapter: [
     ssl_options: [
+      # Workaround for remote server certificate chain issues
+      partial_chain: &:hackney_connect.partial_chain/1,
       # We don't support TLS v1.3 yet
       versions: [:tlsv1, :"tlsv1.1", :"tlsv1.2"]
     ]
@@ -359,7 +361,11 @@ config :pleroma, :gopher,
   port: 9999
 
 config :pleroma, Pleroma.Web.Metadata,
-  providers: [Pleroma.Web.Metadata.Providers.RelMe],
+  providers: [
+    Pleroma.Web.Metadata.Providers.OpenGraph,
+    Pleroma.Web.Metadata.Providers.TwitterCard,
+    Pleroma.Web.Metadata.Providers.RelMe
+  ],
   unfurl_nsfw: false
 
 config :pleroma, :suggestions,

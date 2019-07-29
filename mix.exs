@@ -4,7 +4,7 @@ defmodule Pleroma.Mixfile do
   def project do
     [
       app: :pleroma,
-      version: version("1.0.1"),
+      version: version("1.0.2"),
       elixir: "~> 1.7",
       elixirc_paths: elixirc_paths(Mix.env()),
       compilers: [:phoenix, :gettext] ++ Mix.compilers(),
@@ -95,6 +95,7 @@ defmodule Pleroma.Mixfile do
   defp deps do
     [
       {:phoenix, "~> 1.4.8"},
+      {:tzdata, "~> 1.0"},
       {:plug_cowboy, "~> 2.0"},
       {:phoenix_pubsub, "~> 1.1"},
       {:phoenix_ecto, "~> 4.0"},

@@ -11,6 +11,7 @@ defmodule Pleroma.HTTP.Connection do
     connect_timeout: 10_000,
     recv_timeout: 20_000,
     follow_redirect: true,
+    force_redirect: true,
     pool: :federation
   ]
   @adapter Application.get_env(:tesla, :adapter)
@@ -29,7 +30,7 @@ defmodule Pleroma.HTTP.Connection do
 
   # fetch Hackney options
   #
-  defp hackney_options(opts) do
+  def hackney_options(opts) do
     options = Keyword.get(opts, :adapter, [])
     adapter_options = Pleroma.Config.get([:http, :adapter], [])
     proxy_url = Pleroma.Config.get([:http, :proxy_url], nil)

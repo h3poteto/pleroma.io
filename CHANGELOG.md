@@ -3,6 +3,21 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.0.2] - 2019-07-28
+### Fixed
+- Not being able to pin unlisted posts
+- Mastodon API: represent poll IDs as strings
+- MediaProxy: fix matching filenames
+- MediaProxy: fix filename encoding
+- Migrations: fix a sporadic migration failure
+- Metadata rendering errors resulting in the entire page being inaccessible
+- Federation/MediaProxy not working with instances that have wrong certificate order
+- ActivityPub S2S: remote user deletions now work the same as local user deletions.
+
+### Changed
+- Configuration: OpenGraph and TwitterCard providers enabled by default
+- Configuration: Filter.AnonymizeFilename added ability to retain file extension with custom text
+
 ## [1.0.1] - 2019-07-14
 ### Security
 - OStatus: fix an object spoofing vulnerability.
