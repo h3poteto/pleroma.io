@@ -3,6 +3,10 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+### Fixed
+- `pleroma_ctl` not detecting the master branch properly. If you get "Releases are built only for master and develop branches" error when updating, please add `-` to the end of the line in `releases/start_erl.data`
+
 ## [1.0.2] - 2019-07-28
 ### Fixed
 - Not being able to pin unlisted posts
@@ -13,7 +17,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Metadata rendering errors resulting in the entire page being inaccessible
 - Federation/MediaProxy not working with instances that have wrong certificate order
 - ActivityPub S2S: remote user deletions now work the same as local user deletions.
-- `pleroma_ctl` not detecting the master branch properly. If you get "Releases are built only for master and develop branches" error when updating, please add `-` to the end of the line in `releases/start_erl.data`
 
 ### Changed
 - Configuration: OpenGraph and TwitterCard providers enabled by default
