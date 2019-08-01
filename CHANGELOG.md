@@ -3,6 +3,10 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.0.4] - 2019-08-01
+### Fixed
+- Invalid SemVer version generation, when the current branch does not have commits ahead of tag/checked out on a tag
+
 ## [1.0.3] - 2019-07-31
 ### Security
 - OStatus: eliminate the possibility of a protocol downgrade attack.
