@@ -10,6 +10,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Mastodon API: return the actual profile URL in the Account entity's `url` property when appropriate
 - Templates: properly style anchor tags
 
+### Added
+- Relays: Added a task to list relay subscriptions.
+
 ## [1.0.4] - 2019-08-01
 ### Fixed
 - Invalid SemVer version generation, when the current branch does not have commits ahead of tag/checked out on a tag
