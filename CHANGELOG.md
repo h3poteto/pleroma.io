@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Mastodon API: `muted` in the Status entity, using author's account to determine if the thread was muted
 - Mastodon API: return the actual profile URL in the Account entity's `url` property when appropriate
 - Templates: properly style anchor tags
+- Objects being re-embedded to activities after being updated (e.g faved/reposted). Running 'mix pleroma.database prune_objects' again is advised.
 
 ### Added
 - Relays: Added a task to list relay subscriptions.
@@ -32,10 +33,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [1.0.2] - 2019-07-28
 ### Fixed
 - Not being able to pin unlisted posts
-- Mastodon API: represent poll IDs as strings
-- MediaProxy: fix matching filenames
-- MediaProxy: fix filename encoding
-- Migrations: fix a sporadic migration failure
 - Metadata rendering errors resulting in the entire page being inaccessible
 - Federation/MediaProxy not working with instances that have wrong certificate order
 - ActivityPub S2S: remote user deletions now work the same as local user deletions.
