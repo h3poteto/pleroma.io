@@ -112,7 +112,7 @@ defmodule Pleroma.Web.MastodonAPI.AccountView do
       following_count: following_count,
       statuses_count: user_info.note_count,
       note: bio || "",
-      url: user.ap_id,
+      url: User.profile_url(user),
       avatar: image,
       avatar_static: image,
       header: header,
