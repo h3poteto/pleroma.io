@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Fixed
 - Mastodon API: follower/following counters not being nullified, when `hide_follows`/`hide_followers` is set
 - Mastodon API: `muted` in the Status entity, using author's account to determine if the thread was muted
+- Mastodon API: return the actual profile URL in the Account entity's `url` property when appropriate
 
 ## [1.0.4] - 2019-08-01
 ### Fixed
