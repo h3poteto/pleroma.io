@@ -16,6 +16,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - MRF (Simple Policy): Support for wildcard domains.
 - Support for wildcard domains in user domain blocks setting.
 - Configuration: `quarantined_instances` support wildcard domains.
+- Mix Tasks: `mix pleroma.database fix_likes_collections`
+- Federation: Remove `likes` from objects.
 
 ## [1.0.4] - 2019-08-01
 ### Fixed
