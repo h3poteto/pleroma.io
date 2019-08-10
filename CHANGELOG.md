@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Templates: properly style anchor tags
 - Objects being re-embedded to activities after being updated (e.g faved/reposted). Running 'mix pleroma.database prune_objects' again is advised.
 - Not being able to access the Mastodon FE login page on private instances
+- MRF: ensure that subdomain_match calls are case-insensitive
 
 ### Added
 - Relays: Added a task to list relay subscriptions.
