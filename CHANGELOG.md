@@ -12,6 +12,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 - Relays: Added a task to list relay subscriptions.
+- MRF (Simple Policy): Support for wildcard domains.
+- Support for wildcard domains in user domain blocks setting.
+- Configuration: `quarantined_instances` support wildcard domains.
 
 ## [1.0.4] - 2019-08-01
 ### Fixed
