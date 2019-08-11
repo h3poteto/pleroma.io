@@ -324,17 +324,24 @@ defmodule Pleroma.Web.ActivityPub.Transmogrifier do
 
   def fix_content_map(object), do: object
 
-  def fix_type(%{"inReplyTo" => reply_id} = object) when is_binary(reply_id) do
-    reply = Object.normalize(reply_id)
+  def fix_type(object, options \\ [])
 
-    if reply && (reply.data["type"] == "Question" and object["name"]) do
+  def fix_type(%{"inReplyTo" => reply_id, "name" => _} = object, options)
+      when is_binary(reply_id) do
+    reply =
+      with true <- Federator.allowed_incoming_reply_depth?(options[:depth]),
+           {:ok, object} <- get_obj_helper(reply_id) do
+        object
+      end
+
+    if reply && reply.data["type"] == "Question" do
       Map.put(object, "type", "Answer")
     else
       object
     end
   end
 
-  def fix_type(object), do: object
+  def fix_type(object, _), do: object
 
   defp mastodon_follow_hack(%{"id" => id, "actor" => follower_id}, followed) do
     with true <- id =~ "follows",
