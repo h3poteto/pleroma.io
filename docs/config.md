@@ -268,7 +268,7 @@ config :pleroma, :mrf_subchain,
 * `replace`: A list of tuples containing `{pattern, replacement}`, `pattern` can be a string or a [regular expression](https://hexdocs.pm/elixir/Regex.html)
 
 ## :mrf_vocabulary
-* `accept`: A list of ActivityStreams terms to accept.  If empty, all messages are accepted.
+* `accept`: A list of ActivityStreams terms to accept.  If empty, all supported messages are accepted.
 * `reject`: A list of ActivityStreams terms to reject.  If empty, no messages are rejected.
 
 ## :media_proxy
