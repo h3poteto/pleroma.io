@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 - Relays: Added a task to list relay subscriptions.
+- MRF: Support for filtering posts based on ActivityStreams vocabulary (`Pleroma.Web.ActivityPub.MRF.VocabularyPolicy`)
 - MRF (Simple Policy): Support for wildcard domains.
 - Support for wildcard domains in user domain blocks setting.
 - Configuration: `quarantined_instances` support wildcard domains.
