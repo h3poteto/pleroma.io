@@ -29,5 +29,5 @@ defmodule Pleroma.Web.ActivityPub.MRF.NoPlaceholderTextPolicy do
   def filter(object), do: {:ok, object}
 
   @impl true
-  def describe(), do: {:ok, %{}}
+  def describe, do: {:ok, %{}}
 end

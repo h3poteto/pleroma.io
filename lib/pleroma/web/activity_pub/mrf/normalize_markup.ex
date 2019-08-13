@@ -26,5 +26,5 @@ defmodule Pleroma.Web.ActivityPub.MRF.NormalizeMarkup do
 
   def filter(object), do: {:ok, object}
 
-  def describe(), do: {:ok, %{}}
+  def describe, do: {:ok, %{}}
 end
