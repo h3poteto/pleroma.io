@@ -3,6 +3,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.0.6] - 2019-08-14
+### Fixed
+- MRF: fix use of unserializable keyword lists in describe() implementations
+- ActivityPub S2S: POST requests are now signed with `(request-target)` pseudo-header.
+
 ## [1.0.5] - 2019-08-13
 ### Fixed
 - Mastodon API: follower/following counters not being nullified, when `hide_follows`/`hide_followers` is set
