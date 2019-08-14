@@ -220,6 +220,7 @@ config :pleroma, :instance,
   },
   registrations_open: true,
   federating: true,
+  federation_incoming_replies_max_depth: 100,
   federation_reachability_timeout_days: 7,
   federation_publisher_modules: [
     Pleroma.Web.ActivityPub.Publisher,
@@ -300,7 +301,6 @@ config :pleroma, :assets,
   default_mascot: :pleroma_fox_tan
 
 config :pleroma, :activitypub,
-  accept_blocks: true,
   unfollow_blocked: true,
   outgoing_blocks: true,
   follow_handshake_timeout: 500
@@ -333,6 +333,10 @@ config :pleroma, :mrf_keyword,
   replace: []
 
 config :pleroma, :mrf_subchain, match_actor: %{}
+
+config :pleroma, :mrf_vocabulary,
+  accept: [],
+  reject: []
 
 config :pleroma, :rich_media,
   enabled: true,

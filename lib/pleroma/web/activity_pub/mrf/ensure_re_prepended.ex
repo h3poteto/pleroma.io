@@ -42,4 +42,6 @@ defmodule Pleroma.Web.ActivityPub.MRF.EnsureRePrepended do
   end
 
   def filter(object), do: {:ok, object}
+
+  def describe, do: {:ok, %{}}
 end

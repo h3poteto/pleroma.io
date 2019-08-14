@@ -274,6 +274,9 @@ defmodule Pleroma.Web.ActivityPub.ActivityPub do
     else
       {:fake, true, activity} ->
         {:ok, activity}
+
+      {:error, message} ->
+        {:error, message}
     end
   end
 
@@ -730,8 +733,8 @@ defmodule Pleroma.Web.ActivityPub.ActivityPub do
 
   defp restrict_favorited_by(query, %{"favorited_by" => ap_id}) do
     from(
-      activity in query,
-      where: fragment(~s(? <@ (? #> '{"object","likes"}'\)), ^ap_id, activity.data)
+      [_activity, object] in query,
+      where: fragment("(?)->'likes' \\? (?)", object.data, ^ap_id)
     )
   end
 

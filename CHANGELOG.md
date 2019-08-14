@@ -3,6 +3,32 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.0.5] - 2019-08-13
+### Fixed
+- Mastodon API: follower/following counters not being nullified, when `hide_follows`/`hide_followers` is set
+- Mastodon API: `muted` in the Status entity, using author's account to determine if the thread was muted
+- Mastodon API: return the actual profile URL in the Account entity's `url` property when appropriate
+- Templates: properly style anchor tags
+- Objects being re-embedded to activities after being updated (e.g faved/reposted). Running 'mix pleroma.database prune_objects' again is advised.
+- Not being able to access the Mastodon FE login page on private instances
+- MRF: ensure that subdomain_match calls are case-insensitive
+- Fix internal server error when using the healthcheck API.
+
+### Added
+- **Breaking:** MRF describe API, which adds support for exposing configuration information about MRF policies to NodeInfo.
+  Custom modules will need to be updated by adding, at the very least, `def describe, do: {:ok, %{}}` to the MRF policy modules.
+- Relays: Added a task to list relay subscriptions.
+- MRF: Support for filtering posts based on ActivityStreams vocabulary (`Pleroma.Web.ActivityPub.MRF.VocabularyPolicy`)
+- MRF (Simple Policy): Support for wildcard domains.
+- Support for wildcard domains in user domain blocks setting.
+- Configuration: `quarantined_instances` support wildcard domains.
+- Mix Tasks: `mix pleroma.database fix_likes_collections`
+- Configuration: `federation_incoming_replies_max_depth` option
+
+### Removed
+- Federation: Remove `likes` from objects.
+- ActivityPub: The `accept_blocks` configuration setting.
+
 ## [1.0.4] - 2019-08-01
 ### Fixed
 - Invalid SemVer version generation, when the current branch does not have commits ahead of tag/checked out on a tag

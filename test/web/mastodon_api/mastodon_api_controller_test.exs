@@ -2684,8 +2684,10 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
 
   describe "conversation muting" do
     setup do
+      post_user = insert(:user)
       user = insert(:user)
-      {:ok, activity} = CommonAPI.post(user, %{"status" => "HIE"})
+
+      {:ok, activity} = CommonAPI.post(post_user, %{"status" => "HIE"})
 
       [user: user, activity: activity]
     end
@@ -2875,6 +2877,21 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
 
       assert conn.status == 302
       assert redirected_to(conn) == "/web/login"
+    end
+
+    test "redirects not logged-in users to the login page on private instances", %{
+      conn: conn,
+      path: path
+    } do
+      is_public = Pleroma.Config.get([:instance, :public])
+      Pleroma.Config.put([:instance, :public], false)
+
+      conn = get(conn, path)
+
+      assert conn.status == 302
+      assert redirected_to(conn) == "/web/login"
+
+      Pleroma.Config.put([:instance, :public], is_public)
     end
 
     test "does not redirect logged in users to the login page", %{conn: conn, path: path} do

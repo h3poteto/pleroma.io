@@ -6,6 +6,7 @@ defmodule Pleroma.Web.MastodonAPI.AccountViewTest do
   use Pleroma.DataCase
   import Pleroma.Factory
   alias Pleroma.User
+  alias Pleroma.Web.CommonAPI
   alias Pleroma.Web.MastodonAPI.AccountView
 
   test "Represent a user account" do
@@ -274,5 +275,32 @@ defmodule Pleroma.Web.MastodonAPI.AccountViewTest do
     user = insert(:user, name: "<marquee> username </marquee>")
     result = AccountView.render("account.json", %{user: user})
     refute result.display_name == "<marquee> username </marquee>"
+  end
+
+  describe "hiding follows/following" do
+    test "shows when follows/following are hidden and sets follower/following count to 0" do
+      user = insert(:user, info: %{hide_followers: true, hide_follows: true})
+      other_user = insert(:user)
+      {:ok, user, other_user, _activity} = CommonAPI.follow(user, other_user)
+      {:ok, _other_user, user, _activity} = CommonAPI.follow(other_user, user)
+
+      assert %{
+               followers_count: 0,
+               following_count: 0,
+               pleroma: %{hide_follows: true, hide_followers: true}
+             } = AccountView.render("account.json", %{user: user})
+    end
+
+    test "shows actual follower/following count to the account owner" do
+      user = insert(:user, info: %{hide_followers: true, hide_follows: true})
+      other_user = insert(:user)
+      {:ok, user, other_user, _activity} = CommonAPI.follow(user, other_user)
+      {:ok, _other_user, user, _activity} = CommonAPI.follow(other_user, user)
+
+      assert %{
+               followers_count: 1,
+               following_count: 1
+             } = AccountView.render("account.json", %{user: user, for: user})
+    end
   end
 end
