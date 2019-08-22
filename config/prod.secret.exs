@@ -3,7 +3,7 @@ use Mix.Config
 # Do not use SSL in phoenix.
 # Because SSL set up in ALB with ACM.
 config :pleroma, Pleroma.Web.Endpoint,
-  http: [port: 4000],
+  http: [ip: {0, 0, 0, 0}, port: 4000],
   url: [host: "pleroma.io", scheme: "https", port: 443],
   server: true,
   secret_key_base: System.get_env("SECRET_KEY_BASE")
@@ -16,9 +16,10 @@ config :pleroma, :media_proxy,
 config :pleroma, :instance,
   name: "Pleroma.io",
   email: "h3.poteto@gmail.com",
+  notify_email: "h3.poteto@gmail.com",
   limit: 5000,
   registrations_open: false,
-  dedupe_media: false
+  dynamic_configuration: false
 
 config :pleroma, Pleroma.Repo,
   adapter: Ecto.Adapters.Postgres,
