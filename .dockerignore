@@ -1,5 +1,4 @@
 .circleci
-.git
 *.dump
 _build
 deps
