@@ -85,7 +85,7 @@ jobs:
     docker:
       - image: h3poteto/kubectl:latest
         environment:
-          CLUSTER_NAME: base-prd.cluster.k8s.local
+          CLUSTER_NAME: external-prd.k8s.h3poteto.dev
     working_directory: /var/opt/kube
     steps:
       - run:
@@ -109,11 +109,11 @@ jobs:
       - run:
           name: migration
           command: |
-            ./kube-job run --config=$HOME/.kube/config --template-file=k8s-services/base-prd/pleromaio/job.yml --args="mix ecto.migrate" --container="phoenix" --cleanup="all"
+            ./kube-job run --config=$HOME/.kube/config --template-file=k8s-services/external-prd/pleromaio/job.yml --args="mix ecto.migrate" --container="phoenix" --cleanup="all"
       - run:
           name: deploy
           command: |
-            kubectl patch -f k8s-services/base-prd/pleromaio/deployment.yml -p "{\"spec\":{\"template\":{\"spec\":{\"containers\":[{\"name\":\"phoenix\",\"image\":\"${AWS_ECR_REPOSITORY}:${CIRCLE_SHA1}\"}]}}}}"
+            kubectl patch -f k8s-services/external-prd/pleromaio/deployment.yml -p "{\"spec\":{\"template\":{\"spec\":{\"containers\":[{\"name\":\"phoenix\",\"image\":\"${AWS_ECR_REPOSITORY}:${CIRCLE_SHA1}\"}]}}}}"
 
 
 
