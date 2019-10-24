@@ -103,11 +103,6 @@ defmodule Pleroma.Web.MediaProxyTest do
                "/my%2Flong%2Furl%2F2019%2F07%2FS.jpg",
                "http://pleroma.social/my%2Flong%2Furl%2F2019%2F07%2FS.jpg"
              ) == :ok
-    end
-
-    test "encoded url are tried to match for proxy as `conn.request_path` encodes the url" do
-      # conn.request_path will return encoded url
-      request_path = "/ANALYSE-DAI-_-LE-STABLECOIN-100-D%C3%89CENTRALIS%C3%89-BQ.jpg"
 
       assert MediaProxyController.filename_matches(
                %{"filename" => "/my%2Flong%2Furl%2F2019%2F07%2FS.jp"},
