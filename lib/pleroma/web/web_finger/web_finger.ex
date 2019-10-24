@@ -32,7 +32,7 @@ defmodule Pleroma.Web.WebFinger do
 
   def webfinger(resource, fmt) when fmt in ["XML", "JSON"] do
     host = Pleroma.Web.Endpoint.host()
-    regex = ~r/(acct:)?(?<username>\w+)@#{host}/
+    regex = ~r/(acct:)?(?<username>[a-z0-9A-Z_\.-]+)@#{host}/
 
     with %{"username" => username} <- Regex.named_captures(regex, resource),
          %User{} = user <- User.get_cached_by_nickname(username) do
@@ -86,11 +86,17 @@ defmodule Pleroma.Web.WebFinger do
     |> XmlBuilder.to_doc()
   end
 
-  defp get_magic_key(magic_key) do
-    "data:application/magic-public-key," <> magic_key = magic_key
+  defp get_magic_key("data:application/magic-public-key," <> magic_key) do
     {:ok, magic_key}
-  rescue
-    MatchError -> {:error, "Missing magic key data."}
+  end
+
+  defp get_magic_key(nil) do
+    Logger.debug("Undefined magic key.")
+    {:ok, nil}
+  end
+
+  defp get_magic_key(_) do
+    {:error, "Missing magic key data."}
   end
 
   defp webfinger_from_xml(doc) do
@@ -187,6 +193,7 @@ defmodule Pleroma.Web.WebFinger do
     end
   end
 
+  @spec finger(String.t()) :: {:ok, map()} | {:error, any()}
   def finger(account) do
     account = String.trim_leading(account, "@")
 
@@ -220,8 +227,6 @@ defmodule Pleroma.Web.WebFinger do
       else
         with {:ok, doc} <- Jason.decode(body) do
           webfinger_from_json(doc)
-        else
-          {:error, e} -> e
         end
       end
     else

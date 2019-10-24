@@ -37,11 +37,11 @@ defmodule Pleroma.Web.MastodonAPI.AccountView do
   end
 
   def render("relationship.json", %{user: %User{} = user, target: %User{} = target}) do
-    follow_activity = Pleroma.Web.ActivityPub.Utils.fetch_latest_follow(user, target)
+    follow_state = User.get_cached_follow_state(user, target)
 
     requested =
-      if follow_activity && !User.following?(target, user) do
-        follow_activity.data["state"] == "pending"
+      if follow_state && !User.following?(user, target) do
+        follow_state == "pending"
       else
         false
       end
@@ -50,12 +50,13 @@ defmodule Pleroma.Web.MastodonAPI.AccountView do
       id: to_string(target.id),
       following: User.following?(user, target),
       followed_by: User.following?(target, user),
-      blocking: User.blocks?(user, target),
+      blocking: User.blocks_ap_id?(user, target),
+      blocked_by: User.blocks_ap_id?(target, user),
       muting: User.mutes?(user, target),
-      muting_notifications: false,
+      muting_notifications: User.muted_notifications?(user, target),
       subscribing: User.subscribed_to?(user, target),
       requested: requested,
-      domain_blocking: false,
+      domain_blocking: User.blocks_domain?(user, target),
       showing_reblogs: User.showing_reblogs?(user, target),
       endorsed: false
     }
@@ -93,12 +94,18 @@ defmodule Pleroma.Web.MastodonAPI.AccountView do
       end)
 
     fields =
-      (user.info.source_data["attachment"] || [])
-      |> Enum.filter(fn %{"type" => t} -> t == "PropertyValue" end)
-      |> Enum.map(fn fields -> Map.take(fields, ["name", "value"]) end)
+      user.info
+      |> User.Info.fields()
+      |> Enum.map(fn %{"name" => name, "value" => value} ->
+        %{
+          "name" => Pleroma.HTML.strip_tags(name),
+          "value" => Pleroma.HTML.filter_tags(value, Pleroma.HTML.Scrubber.LinksOnly)
+        }
+      end)
+
+    raw_fields = Map.get(user.info, :raw_fields, [])
 
     bio = HTML.filter_tags(user.bio, User.html_filter_policy(opts[:for]))
-
     relationship = render("relationship.json", %{user: opts[:for], target: user})
 
     %{
@@ -123,6 +130,7 @@ defmodule Pleroma.Web.MastodonAPI.AccountView do
       source: %{
         note: HTML.strip_tags((user.bio || "") |> String.replace("<br>", "\n")),
         sensitive: false,
+        fields: raw_fields,
         pleroma: %{}
       },
 
@@ -143,6 +151,7 @@ defmodule Pleroma.Web.MastodonAPI.AccountView do
     |> maybe_put_notification_settings(user, opts[:for])
     |> maybe_put_settings_store(user, opts[:for], opts)
     |> maybe_put_chat_token(user, opts[:for], opts)
+    |> maybe_put_activation_status(user, opts[:for])
   end
 
   defp username_from_nickname(string) when is_binary(string) do
@@ -202,6 +211,12 @@ defmodule Pleroma.Web.MastodonAPI.AccountView do
   end
 
   defp maybe_put_notification_settings(data, _, _), do: data
+
+  defp maybe_put_activation_status(data, user, %User{info: %{is_admin: true}}) do
+    Kernel.put_in(data, [:pleroma, :deactivated], user.info.deactivated)
+  end
+
+  defp maybe_put_activation_status(data, _, _), do: data
 
   defp image_url(%{"url" => [%{"href" => href} | _]}), do: href
   defp image_url(_), do: nil

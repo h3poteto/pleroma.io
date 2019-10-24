@@ -5,31 +5,21 @@
 defmodule Pleroma.Web.OAuth.OAuthControllerTest do
   use Pleroma.Web.ConnCase
   import Pleroma.Factory
-  import Mock
 
-  alias Pleroma.Registration
   alias Pleroma.Repo
   alias Pleroma.Web.OAuth.Authorization
   alias Pleroma.Web.OAuth.OAuthController
   alias Pleroma.Web.OAuth.Token
 
-  @oauth_config_path [:oauth2, :issue_new_refresh_token]
   @session_opts [
     store: :cookie,
     key: "_test",
     signing_salt: "cooldude"
   ]
+  clear_config_all([:instance, :account_activation_required])
 
   describe "in OAuth consumer mode, " do
     setup do
-      oauth_consumer_strategies_path = [:auth, :oauth_consumer_strategies]
-      oauth_consumer_strategies = Pleroma.Config.get(oauth_consumer_strategies_path)
-      Pleroma.Config.put(oauth_consumer_strategies_path, ~w(twitter facebook))
-
-      on_exit(fn ->
-        Pleroma.Config.put(oauth_consumer_strategies_path, oauth_consumer_strategies)
-      end)
-
       [
         app: insert(:oauth_app),
         conn:
@@ -37,6 +27,13 @@ defmodule Pleroma.Web.OAuth.OAuthControllerTest do
           |> Plug.Session.call(Plug.Session.init(@session_opts))
           |> fetch_session()
       ]
+    end
+
+    clear_config([:auth, :oauth_consumer_strategies]) do
+      Pleroma.Config.put(
+        [:auth, :oauth_consumer_strategies],
+        ~w(twitter facebook)
+      )
     end
 
     test "GET /oauth/authorize renders auth forms, including OAuth consumer form", %{
@@ -108,28 +105,26 @@ defmodule Pleroma.Web.OAuth.OAuthControllerTest do
         "state" => ""
       }
 
-      with_mock Pleroma.Web.Auth.Authenticator,
-        get_registration: fn _ -> {:ok, registration} end do
-        conn =
-          get(
-            conn,
-            "/oauth/twitter/callback",
-            %{
-              "oauth_token" => "G-5a3AAAAAAAwMH9AAABaektfSM",
-              "oauth_verifier" => "QZl8vUqNvXMTKpdmUnGejJxuHG75WWWs",
-              "provider" => "twitter",
-              "state" => Poison.encode!(state_params)
-            }
-          )
+      conn =
+        conn
+        |> assign(:ueberauth_auth, %{provider: registration.provider, uid: registration.uid})
+        |> get(
+          "/oauth/twitter/callback",
+          %{
+            "oauth_token" => "G-5a3AAAAAAAwMH9AAABaektfSM",
+            "oauth_verifier" => "QZl8vUqNvXMTKpdmUnGejJxuHG75WWWs",
+            "provider" => "twitter",
+            "state" => Poison.encode!(state_params)
+          }
+        )
 
-        assert response = html_response(conn, 302)
-        assert redirected_to(conn) =~ ~r/#{redirect_uri}\?code=.+/
-      end
+      assert response = html_response(conn, 302)
+      assert redirected_to(conn) =~ ~r/#{redirect_uri}\?code=.+/
     end
 
     test "with user-unbound registration, GET /oauth/<provider>/callback renders registration_details page",
          %{app: app, conn: conn} do
-      registration = insert(:registration, user: nil)
+      user = insert(:user)
 
       state_params = %{
         "scope" => "read write",
@@ -138,26 +133,28 @@ defmodule Pleroma.Web.OAuth.OAuthControllerTest do
         "state" => "a_state"
       }
 
-      with_mock Pleroma.Web.Auth.Authenticator,
-        get_registration: fn _ -> {:ok, registration} end do
-        conn =
-          get(
-            conn,
-            "/oauth/twitter/callback",
-            %{
-              "oauth_token" => "G-5a3AAAAAAAwMH9AAABaektfSM",
-              "oauth_verifier" => "QZl8vUqNvXMTKpdmUnGejJxuHG75WWWs",
-              "provider" => "twitter",
-              "state" => Poison.encode!(state_params)
-            }
-          )
+      conn =
+        conn
+        |> assign(:ueberauth_auth, %{
+          provider: "twitter",
+          uid: "171799000",
+          info: %{nickname: user.nickname, email: user.email, name: user.name, description: nil}
+        })
+        |> get(
+          "/oauth/twitter/callback",
+          %{
+            "oauth_token" => "G-5a3AAAAAAAwMH9AAABaektfSM",
+            "oauth_verifier" => "QZl8vUqNvXMTKpdmUnGejJxuHG75WWWs",
+            "provider" => "twitter",
+            "state" => Poison.encode!(state_params)
+          }
+        )
 
-        assert response = html_response(conn, 200)
-        assert response =~ ~r/name="op" type="submit" value="register"/
-        assert response =~ ~r/name="op" type="submit" value="connect"/
-        assert response =~ Registration.email(registration)
-        assert response =~ Registration.nickname(registration)
-      end
+      assert response = html_response(conn, 200)
+      assert response =~ ~r/name="op" type="submit" value="register"/
+      assert response =~ ~r/name="op" type="submit" value="connect"/
+      assert response =~ user.email
+      assert response =~ user.nickname
     end
 
     test "on authentication error, GET /oauth/<provider>/callback redirects to `redirect_uri`", %{
@@ -777,12 +774,7 @@ defmodule Pleroma.Web.OAuth.OAuthControllerTest do
     end
 
     test "rejects token exchange for valid credentials belonging to unconfirmed user and confirmation is required" do
-      setting = Pleroma.Config.get([:instance, :account_activation_required])
-
-      unless setting do
-        Pleroma.Config.put([:instance, :account_activation_required], true)
-        on_exit(fn -> Pleroma.Config.put([:instance, :account_activation_required], setting) end)
-      end
+      Pleroma.Config.put([:instance, :account_activation_required], true)
 
       password = "testpassword"
       user = insert(:user, password_hash: Comeonin.Pbkdf2.hashpwsalt(password))
@@ -859,16 +851,10 @@ defmodule Pleroma.Web.OAuth.OAuthControllerTest do
   end
 
   describe "POST /oauth/token - refresh token" do
-    setup do
-      oauth_token_config = Pleroma.Config.get(@oauth_config_path)
-
-      on_exit(fn ->
-        Pleroma.Config.get(@oauth_config_path, oauth_token_config)
-      end)
-    end
+    clear_config([:oauth2, :issue_new_refresh_token])
 
     test "issues a new access token with keep fresh token" do
-      Pleroma.Config.put(@oauth_config_path, true)
+      Pleroma.Config.put([:oauth2, :issue_new_refresh_token], true)
       user = insert(:user)
       app = insert(:oauth_app, scopes: ["read", "write"])
 
@@ -908,7 +894,7 @@ defmodule Pleroma.Web.OAuth.OAuthControllerTest do
     end
 
     test "issues a new access token with new fresh token" do
-      Pleroma.Config.put(@oauth_config_path, false)
+      Pleroma.Config.put([:oauth2, :issue_new_refresh_token], false)
       user = insert(:user)
       app = insert(:oauth_app, scopes: ["read", "write"])
 

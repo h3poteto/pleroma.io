@@ -1,3 +1,7 @@
+# Pleroma: A lightweight social networking server
+# Copyright © 2017-2019 Pleroma Authors <https://pleroma.social/>
+# SPDX-License-Identifier: AGPL-3.0-only
+
 defmodule Pleroma.Web.MastodonAPI.ConversationView do
   use Pleroma.Web, :view
 
@@ -7,8 +11,8 @@ defmodule Pleroma.Web.MastodonAPI.ConversationView do
   alias Pleroma.Web.MastodonAPI.AccountView
   alias Pleroma.Web.MastodonAPI.StatusView
 
-  def render("participation.json", %{participation: participation, user: user}) do
-    participation = Repo.preload(participation, conversation: :users)
+  def render("participation.json", %{participation: participation, for: user}) do
+    participation = Repo.preload(participation, conversation: [], recipients: [])
 
     last_activity_id =
       with nil <- participation.last_activity_id do
@@ -24,7 +28,7 @@ defmodule Pleroma.Web.MastodonAPI.ConversationView do
 
     # Conversations return all users except the current user.
     users =
-      participation.conversation.users
+      participation.recipients
       |> Enum.reject(&(&1.id == user.id))
 
     accounts =

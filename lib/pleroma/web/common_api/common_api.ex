@@ -4,7 +4,8 @@
 
 defmodule Pleroma.Web.CommonAPI do
   alias Pleroma.Activity
-  alias Pleroma.Bookmark
+  alias Pleroma.ActivityExpiration
+  alias Pleroma.Conversation.Participation
   alias Pleroma.Formatter
   alias Pleroma.Object
   alias Pleroma.ThreadMute
@@ -13,7 +14,10 @@ defmodule Pleroma.Web.CommonAPI do
   alias Pleroma.Web.ActivityPub.Utils
   alias Pleroma.Web.ActivityPub.Visibility
 
+  import Pleroma.Web.Gettext
   import Pleroma.Web.CommonAPI.Utils
+
+  require Pleroma.Constants
 
   def follow(follower, followed) do
     with {:ok, follower} <- User.maybe_direct_follow(follower, followed),
@@ -30,7 +34,8 @@ defmodule Pleroma.Web.CommonAPI do
 
   def unfollow(follower, unfollowed) do
     with {:ok, follower, _follow_activity} <- User.unfollow(follower, unfollowed),
-         {:ok, _activity} <- ActivityPub.unfollow(follower, unfollowed) do
+         {:ok, _activity} <- ActivityPub.unfollow(follower, unfollowed),
+         {:ok, _unfollowed} <- User.unsubscribe(follower, unfollowed) do
       {:ok, follower}
     end
   end
@@ -74,7 +79,7 @@ defmodule Pleroma.Web.CommonAPI do
       {:ok, delete}
     else
       _ ->
-        {:error, "Could not delete"}
+        {:error, dgettext("errors", "Could not delete")}
     end
   end
 
@@ -85,7 +90,7 @@ defmodule Pleroma.Web.CommonAPI do
       ActivityPub.announce(user, object)
     else
       _ ->
-        {:error, "Could not repeat"}
+        {:error, dgettext("errors", "Could not repeat")}
     end
   end
 
@@ -95,7 +100,7 @@ defmodule Pleroma.Web.CommonAPI do
       ActivityPub.unannounce(user, object)
     else
       _ ->
-        {:error, "Could not unrepeat"}
+        {:error, dgettext("errors", "Could not unrepeat")}
     end
   end
 
@@ -106,7 +111,7 @@ defmodule Pleroma.Web.CommonAPI do
       ActivityPub.like(user, object)
     else
       _ ->
-        {:error, "Could not favorite"}
+        {:error, dgettext("errors", "Could not favorite")}
     end
   end
 
@@ -116,7 +121,7 @@ defmodule Pleroma.Web.CommonAPI do
       ActivityPub.unlike(user, object)
     else
       _ ->
-        {:error, "Could not unfavorite"}
+        {:error, dgettext("errors", "Could not unfavorite")}
     end
   end
 
@@ -148,10 +153,10 @@ defmodule Pleroma.Web.CommonAPI do
       object = Object.get_cached_by_ap_id(object.data["id"])
       {:ok, answer_activities, object}
     else
-      {:author, _} -> {:error, "Poll's author can't vote"}
-      {:existing_votes, _} -> {:error, "Already voted"}
-      {:choice_check, {_, false}} -> {:error, "Invalid indices"}
-      {:count_check, false} -> {:error, "Too many choices"}
+      {:author, _} -> {:error, dgettext("errors", "Poll's author can't vote")}
+      {:existing_votes, _} -> {:error, dgettext("errors", "Already voted")}
+      {:choice_check, {_, false}} -> {:error, dgettext("errors", "Invalid indices")}
+      {:count_check, false} -> {:error, dgettext("errors", "Too many choices")}
     end
   end
 
@@ -170,16 +175,25 @@ defmodule Pleroma.Web.CommonAPI do
     end)
   end
 
-  def get_visibility(%{"visibility" => visibility}, in_reply_to)
+  def get_visibility(_, _, %Participation{}) do
+    {"direct", "direct"}
+  end
+
+  def get_visibility(%{"visibility" => visibility}, in_reply_to, _)
       when visibility in ~w{public unlisted private direct},
       do: {visibility, get_replied_to_visibility(in_reply_to)}
 
-  def get_visibility(_, in_reply_to) when not is_nil(in_reply_to) do
+  def get_visibility(%{"visibility" => "list:" <> list_id}, in_reply_to, _) do
+    visibility = {:list, String.to_integer(list_id)}
+    {visibility, get_replied_to_visibility(in_reply_to)}
+  end
+
+  def get_visibility(_, in_reply_to, _) when not is_nil(in_reply_to) do
     visibility = get_replied_to_visibility(in_reply_to)
     {visibility, visibility}
   end
 
-  def get_visibility(_, in_reply_to), do: {"public", get_replied_to_visibility(in_reply_to)}
+  def get_visibility(_, in_reply_to, _), do: {"public", get_replied_to_visibility(in_reply_to)}
 
   def get_replied_to_visibility(nil), do: nil
 
@@ -189,13 +203,32 @@ defmodule Pleroma.Web.CommonAPI do
     end
   end
 
+  defp check_expiry_date({:ok, nil} = res), do: res
+
+  defp check_expiry_date({:ok, in_seconds}) do
+    expiry = NaiveDateTime.utc_now() |> NaiveDateTime.add(in_seconds)
+
+    if ActivityExpiration.expires_late_enough?(expiry) do
+      {:ok, expiry}
+    else
+      {:error, "Expiry date is too soon"}
+    end
+  end
+
+  defp check_expiry_date(expiry_str) do
+    Ecto.Type.cast(:integer, expiry_str)
+    |> check_expiry_date()
+  end
+
   def post(user, %{"status" => status} = data) do
     limit = Pleroma.Config.get([:instance, :limit])
 
     with status <- String.trim(status),
          attachments <- attachments_from_ids(data),
          in_reply_to <- get_replied_to_activity(data["in_reply_to_status_id"]),
-         {visibility, in_reply_to_visibility} <- get_visibility(data, in_reply_to),
+         in_reply_to_conversation <- Participation.get(data["in_reply_to_conversation_id"]),
+         {visibility, in_reply_to_visibility} <-
+           get_visibility(data, in_reply_to, in_reply_to_conversation),
          {_, false} <-
            {:private_to_public, in_reply_to_visibility == "direct" && visibility != "direct"},
          {content_html, mentions, tags} <-
@@ -208,10 +241,12 @@ defmodule Pleroma.Web.CommonAPI do
          mentioned_users <- for({_, mentioned_user} <- mentions, do: mentioned_user.ap_id),
          addressed_users <- get_addressed_users(mentioned_users, data["to"]),
          {poll, poll_emoji} <- make_poll_data(data),
-         {to, cc} <- get_to_and_cc(user, addressed_users, in_reply_to, visibility),
-         context <- make_context(in_reply_to),
+         {to, cc} <-
+           get_to_and_cc(user, addressed_users, in_reply_to, visibility, in_reply_to_conversation),
+         context <- make_context(in_reply_to, in_reply_to_conversation),
          cw <- data["spoiler_text"] || "",
          sensitive <- data["sensitive"] || Enum.member?(tags, {"#nsfw", "nsfw"}),
+         {:ok, expires_at} <- check_expiry_date(data["expires_in"]),
          full_payload <- String.trim(status <> cw),
          :ok <- validate_character_limit(full_payload, attachments, limit),
          object <-
@@ -234,23 +269,36 @@ defmodule Pleroma.Web.CommonAPI do
              "emoji",
              Map.merge(Formatter.get_emoji_map(full_payload), poll_emoji)
            ) do
-      res =
-        ActivityPub.create(
-          %{
-            to: to,
-            actor: user,
-            context: context,
-            object: object,
-            additional: %{"cc" => cc, "directMessage" => visibility == "direct"}
-          },
-          Pleroma.Web.ControllerHelper.truthy_param?(data["preview"]) || false
-        )
+      preview? = Pleroma.Web.ControllerHelper.truthy_param?(data["preview"]) || false
+      direct? = visibility == "direct"
 
-      res
+      result =
+        %{
+          to: to,
+          actor: user,
+          context: context,
+          object: object,
+          additional: %{"cc" => cc, "directMessage" => direct?}
+        }
+        |> maybe_add_list_data(user, visibility)
+        |> ActivityPub.create(preview?)
+
+      if expires_at do
+        with {:ok, activity} <- result do
+          {:ok, _} = ActivityExpiration.create(activity, expires_at)
+        end
+      end
+
+      result
     else
-      {:private_to_public, true} -> {:error, "The message visibility must be direct"}
-      {:error, _} = e -> e
-      e -> {:error, e}
+      {:private_to_public, true} ->
+        {:error, dgettext("errors", "The message visibility must be direct")}
+
+      {:error, _} = e ->
+        e
+
+      e ->
+        {:error, e}
     end
   end
 
@@ -270,7 +318,7 @@ defmodule Pleroma.Web.CommonAPI do
 
     ActivityPub.update(%{
       local: true,
-      to: [user.follower_address],
+      to: [Pleroma.Constants.as_public(), user.follower_address],
       cc: [],
       actor: user.ap_id,
       object: Pleroma.Web.ActivityPub.UserView.render("user.json", %{user: user})
@@ -290,8 +338,7 @@ defmodule Pleroma.Web.CommonAPI do
            }
          } = activity <- get_by_id_or_ap_id(id_or_ap_id),
          true <- Visibility.is_public?(activity),
-         %{valid?: true} = info_changeset <-
-           User.Info.add_pinnned_activity(user.info, activity),
+         %{valid?: true} = info_changeset <- User.Info.add_pinnned_activity(user.info, activity),
          changeset <-
            Ecto.Changeset.change(user) |> Ecto.Changeset.put_embed(:info, info_changeset),
          {:ok, _user} <- User.update_and_set_cache(changeset) do
@@ -301,7 +348,7 @@ defmodule Pleroma.Web.CommonAPI do
         {:error, err}
 
       _ ->
-        {:error, "Could not pin"}
+        {:error, dgettext("errors", "Could not pin")}
     end
   end
 
@@ -318,7 +365,7 @@ defmodule Pleroma.Web.CommonAPI do
         {:error, err}
 
       _ ->
-        {:error, "Could not unpin"}
+        {:error, dgettext("errors", "Could not unpin")}
     end
   end
 
@@ -326,7 +373,7 @@ defmodule Pleroma.Web.CommonAPI do
     with {:ok, _} <- ThreadMute.add_mute(user.id, activity.data["context"]) do
       {:ok, activity}
     else
-      {:error, _} -> {:error, "conversation is already muted"}
+      {:error, _} -> {:error, dgettext("errors", "conversation is already muted")}
     end
   end
 
@@ -342,15 +389,6 @@ defmodule Pleroma.Web.CommonAPI do
       false
     else
       _ -> true
-    end
-  end
-
-  def bookmarked?(user, activity) do
-    with %Bookmark{} <- Bookmark.get(user.id, activity.id) do
-      true
-    else
-      _ ->
-        false
     end
   end
 
@@ -371,8 +409,8 @@ defmodule Pleroma.Web.CommonAPI do
       {:ok, activity}
     else
       {:error, err} -> {:error, err}
-      {:account_id, %{}} -> {:error, "Valid `account_id` required"}
-      {:account, nil} -> {:error, "Account not found"}
+      {:account_id, %{}} -> {:error, dgettext("errors", "Valid `account_id` required")}
+      {:account, nil} -> {:error, dgettext("errors", "Account not found")}
     end
   end
 
@@ -381,14 +419,9 @@ defmodule Pleroma.Web.CommonAPI do
          {:ok, activity} <- Utils.update_report_state(activity, state) do
       {:ok, activity}
     else
-      nil ->
-        {:error, :not_found}
-
-      {:error, reason} ->
-        {:error, reason}
-
-      _ ->
-        {:error, "Could not update state"}
+      nil -> {:error, :not_found}
+      {:error, reason} -> {:error, reason}
+      _ -> {:error, dgettext("errors", "Could not update state")}
     end
   end
 
@@ -398,11 +431,8 @@ defmodule Pleroma.Web.CommonAPI do
          {:ok, activity} <- set_visibility(activity, opts) do
       {:ok, activity}
     else
-      nil ->
-        {:error, :not_found}
-
-      {:error, reason} ->
-        {:error, reason}
+      nil -> {:error, :not_found}
+      {:error, reason} -> {:error, reason}
     end
   end
 

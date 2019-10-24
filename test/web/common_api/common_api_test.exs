@@ -5,18 +5,68 @@
 defmodule Pleroma.Web.CommonAPITest do
   use Pleroma.DataCase
   alias Pleroma.Activity
+  alias Pleroma.Conversation.Participation
   alias Pleroma.Object
   alias Pleroma.User
   alias Pleroma.Web.ActivityPub.ActivityPub
+  alias Pleroma.Web.ActivityPub.Visibility
   alias Pleroma.Web.CommonAPI
 
   import Pleroma.Factory
+
+  require Pleroma.Constants
+
+  clear_config([:instance, :safe_dm_mentions])
+  clear_config([:instance, :limit])
+  clear_config([:instance, :max_pinned_statuses])
+
+  test "when replying to a conversation / participation, it will set the correct context id even if no explicit reply_to is given" do
+    user = insert(:user)
+    {:ok, activity} = CommonAPI.post(user, %{"status" => ".", "visibility" => "direct"})
+
+    [participation] = Participation.for_user(user)
+
+    {:ok, convo_reply} =
+      CommonAPI.post(user, %{"status" => ".", "in_reply_to_conversation_id" => participation.id})
+
+    assert Visibility.is_direct?(convo_reply)
+
+    assert activity.data["context"] == convo_reply.data["context"]
+  end
+
+  test "when replying to a conversation / participation, it only mentions the recipients explicitly declared in the participation" do
+    har = insert(:user)
+    jafnhar = insert(:user)
+    tridi = insert(:user)
+
+    {:ok, activity} =
+      CommonAPI.post(har, %{
+        "status" => "@#{jafnhar.nickname} hey",
+        "visibility" => "direct"
+      })
+
+    assert har.ap_id in activity.recipients
+    assert jafnhar.ap_id in activity.recipients
+
+    [participation] = Participation.for_user(har)
+
+    {:ok, activity} =
+      CommonAPI.post(har, %{
+        "status" => "I don't really like @#{tridi.nickname}",
+        "visibility" => "direct",
+        "in_reply_to_status_id" => activity.id,
+        "in_reply_to_conversation_id" => participation.id
+      })
+
+    assert har.ap_id in activity.recipients
+    assert jafnhar.ap_id in activity.recipients
+    refute tridi.ap_id in activity.recipients
+  end
 
   test "with the safe_dm_mention option set, it does not mention people beyond the initial tags" do
     har = insert(:user)
     jafnhar = insert(:user)
     tridi = insert(:user)
-    option = Pleroma.Config.get([:instance, :safe_dm_mentions])
     Pleroma.Config.put([:instance, :safe_dm_mentions], true)
 
     {:ok, activity} =
@@ -27,14 +77,13 @@ defmodule Pleroma.Web.CommonAPITest do
 
     refute tridi.ap_id in activity.recipients
     assert jafnhar.ap_id in activity.recipients
-    Pleroma.Config.put([:instance, :safe_dm_mentions], option)
   end
 
   test "it de-duplicates tags" do
     user = insert(:user)
     {:ok, activity} = CommonAPI.post(user, %{"status" => "#2hu #2HU"})
 
-    object = Object.normalize(activity.data["object"])
+    object = Object.normalize(activity)
 
     assert object.data["tag"] == ["2hu"]
   end
@@ -49,11 +98,13 @@ defmodule Pleroma.Web.CommonAPITest do
   test "it adds emoji when updating profiles" do
     user = insert(:user, %{name: ":firefox:"})
 
-    CommonAPI.update(user)
+    {:ok, activity} = CommonAPI.update(user)
     user = User.get_cached_by_ap_id(user.ap_id)
     [firefox] = user.info.source_data["tag"]
 
     assert firefox["name"] == ":firefox:"
+
+    assert Pleroma.Constants.as_public() in activity.recipients
   end
 
   describe "posting" do
@@ -87,7 +138,7 @@ defmodule Pleroma.Web.CommonAPITest do
           "content_type" => "text/html"
         })
 
-      object = Object.normalize(activity.data["object"])
+      object = Object.normalize(activity)
 
       assert object.data["content"] == "<p><b>2hu</b></p>alert('xss')"
     end
@@ -103,7 +154,7 @@ defmodule Pleroma.Web.CommonAPITest do
           "content_type" => "text/markdown"
         })
 
-      object = Object.normalize(activity.data["object"])
+      object = Object.normalize(activity)
 
       assert object.data["content"] == "<p><b>2hu</b></p>alert('xss')"
     end
@@ -128,6 +179,49 @@ defmodule Pleroma.Web.CommonAPITest do
                    "in_reply_to_status_id" => activity.id
                  })
       end)
+    end
+
+    test "it allows to address a list" do
+      user = insert(:user)
+      {:ok, list} = Pleroma.List.create("foo", user)
+
+      {:ok, activity} =
+        CommonAPI.post(user, %{"status" => "foobar", "visibility" => "list:#{list.id}"})
+
+      assert activity.data["bcc"] == [list.ap_id]
+      assert activity.recipients == [list.ap_id, user.ap_id]
+      assert activity.data["listMessage"] == list.ap_id
+    end
+
+    test "it returns error when status is empty and no attachments" do
+      user = insert(:user)
+
+      assert {:error, "Cannot post an empty status without attachments"} =
+               CommonAPI.post(user, %{"status" => ""})
+    end
+
+    test "it returns error when character limit is exceeded" do
+      Pleroma.Config.put([:instance, :limit], 5)
+
+      user = insert(:user)
+
+      assert {:error, "The status is over the character limit"} =
+               CommonAPI.post(user, %{"status" => "foobar"})
+    end
+
+    test "it can handle activities that expire" do
+      user = insert(:user)
+
+      expires_at =
+        NaiveDateTime.utc_now()
+        |> NaiveDateTime.truncate(:second)
+        |> NaiveDateTime.add(1_000_000, :second)
+
+      assert {:ok, activity} =
+               CommonAPI.post(user, %{"status" => "chai", "expires_in" => 1_000_000})
+
+      assert expiration = Pleroma.ActivityExpiration.get_by_activity_id(activity.id)
+      assert expiration.scheduled_at == expires_at
     end
   end
 
@@ -346,6 +440,20 @@ defmodule Pleroma.Web.CommonAPITest do
     end
   end
 
+  describe "unfollow/2" do
+    test "also unsubscribes a user" do
+      [follower, followed] = insert_pair(:user)
+      {:ok, follower, followed, _} = CommonAPI.follow(follower, followed)
+      {:ok, followed} = User.subscribe(follower, followed)
+
+      assert User.subscribed_to?(follower, followed)
+
+      {:ok, follower} = CommonAPI.unfollow(follower, followed)
+
+      refute User.subscribed_to?(follower, followed)
+    end
+  end
+
   describe "accept_follow_request/2" do
     test "after acceptance, it sets all existing pending follow request states to 'accept'" do
       user = insert(:user, info: %{locked: true})
@@ -385,6 +493,25 @@ defmodule Pleroma.Web.CommonAPITest do
       assert Repo.get(Activity, follow_activity.id).data["state"] == "reject"
       assert Repo.get(Activity, follow_activity_two.id).data["state"] == "reject"
       assert Repo.get(Activity, follow_activity_three.id).data["state"] == "pending"
+    end
+  end
+
+  describe "vote/3" do
+    test "does not allow to vote twice" do
+      user = insert(:user)
+      other_user = insert(:user)
+
+      {:ok, activity} =
+        CommonAPI.post(user, %{
+          "status" => "Am I cute?",
+          "poll" => %{"options" => ["Yes", "No"], "expires_in" => 20}
+        })
+
+      object = Object.normalize(activity)
+
+      {:ok, _, object} = CommonAPI.vote(other_user, object, [0])
+
+      assert {:error, "Already voted"} == CommonAPI.vote(other_user, object, [1])
     end
   end
 end

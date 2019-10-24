@@ -16,6 +16,8 @@ defmodule Pleroma.User.Info do
     field(:source_data, :map, default: %{})
     field(:note_count, :integer, default: 0)
     field(:follower_count, :integer, default: 0)
+    # Should be filled in only for remote users
+    field(:following_count, :integer, default: nil)
     field(:locked, :boolean, default: false)
     field(:confirmation_pending, :boolean, default: false)
     field(:confirmation_token, :string, default: nil)
@@ -24,6 +26,7 @@ defmodule Pleroma.User.Info do
     field(:domain_blocks, {:array, :string}, default: [])
     field(:mutes, {:array, :string}, default: [])
     field(:muted_reblogs, {:array, :string}, default: [])
+    field(:muted_notifications, {:array, :string}, default: [])
     field(:subscribers, {:array, :string}, default: [])
     field(:deactivated, :boolean, default: false)
     field(:no_rich_text, :boolean, default: false)
@@ -42,9 +45,12 @@ defmodule Pleroma.User.Info do
     field(:hide_follows, :boolean, default: false)
     field(:hide_favorites, :boolean, default: true)
     field(:pinned_activities, {:array, :string}, default: [])
+    field(:email_notifications, :map, default: %{"digest" => false})
     field(:mascot, :map, default: nil)
     field(:emoji, {:array, :map}, default: [])
     field(:pleroma_settings_store, :map, default: %{})
+    field(:fields, {:array, :map}, default: nil)
+    field(:raw_fields, {:array, :map}, default: [])
 
     field(:notification_settings, :map,
       default: %{
@@ -92,6 +98,30 @@ defmodule Pleroma.User.Info do
     |> validate_required([:notification_settings])
   end
 
+  @doc """
+  Update email notifications in the given User.Info struct.
+
+  Examples:
+
+      iex> update_email_notifications(%Pleroma.User.Info{email_notifications: %{"digest" => false}}, %{"digest" => true})
+      %Pleroma.User.Info{email_notifications: %{"digest" => true}}
+
+  """
+  @spec update_email_notifications(t(), map()) :: Ecto.Changeset.t()
+  def update_email_notifications(info, settings) do
+    email_notifications =
+      info.email_notifications
+      |> Map.merge(settings)
+      |> Map.take(["digest"])
+
+    params = %{email_notifications: email_notifications}
+    fields = [:email_notifications]
+
+    info
+    |> cast(params, fields)
+    |> validate_required(fields)
+  end
+
   def add_to_note_count(info, number) do
     set_note_count(info, info.note_count + number)
   end
@@ -120,6 +150,16 @@ defmodule Pleroma.User.Info do
     |> validate_required([:mutes])
   end
 
+  @spec set_notification_mutes(Changeset.t(), [String.t()], boolean()) :: Changeset.t()
+  def set_notification_mutes(changeset, muted_notifications, notifications?) do
+    if notifications? do
+      put_change(changeset, :muted_notifications, muted_notifications)
+      |> validate_required([:muted_notifications])
+    else
+      changeset
+    end
+  end
+
   def set_blocks(info, blocks) do
     params = %{blocks: blocks}
 
@@ -136,12 +176,29 @@ defmodule Pleroma.User.Info do
     |> validate_required([:subscribers])
   end
 
+  @spec add_to_mutes(Info.t(), String.t()) :: Changeset.t()
   def add_to_mutes(info, muted) do
     set_mutes(info, Enum.uniq([muted | info.mutes]))
   end
 
+  @spec add_to_muted_notifications(Changeset.t(), Info.t(), String.t(), boolean()) ::
+          Changeset.t()
+  def add_to_muted_notifications(changeset, info, muted, notifications?) do
+    set_notification_mutes(
+      changeset,
+      Enum.uniq([muted | info.muted_notifications]),
+      notifications?
+    )
+  end
+
+  @spec remove_from_mutes(Info.t(), String.t()) :: Changeset.t()
   def remove_from_mutes(info, muted) do
     set_mutes(info, List.delete(info.mutes, muted))
+  end
+
+  @spec remove_from_muted_notifications(Changeset.t(), Info.t(), String.t()) :: Changeset.t()
+  def remove_from_muted_notifications(changeset, info, muted) do
+    set_notification_mutes(changeset, List.delete(info.muted_notifications, muted), true)
   end
 
   def add_to_block(info, blocked) do
@@ -195,19 +252,31 @@ defmodule Pleroma.User.Info do
       :uri,
       :hub,
       :topic,
-      :salmon
+      :salmon,
+      :hide_followers,
+      :hide_follows,
+      :follower_count,
+      :fields,
+      :following_count
     ])
+    |> validate_fields(true)
   end
 
-  def user_upgrade(info, params) do
+  def user_upgrade(info, params, remote? \\ false) do
     info
     |> cast(params, [
       :ap_enabled,
       :source_data,
       :banner,
       :locked,
-      :magic_key
+      :magic_key,
+      :follower_count,
+      :following_count,
+      :hide_follows,
+      :fields,
+      :hide_followers
     ])
+    |> validate_fields(remote?)
   end
 
   def profile_update(info, params) do
@@ -223,9 +292,39 @@ defmodule Pleroma.User.Info do
       :background,
       :show_role,
       :skip_thread_containment,
+      :fields,
+      :raw_fields,
       :pleroma_settings_store
     ])
+    |> validate_fields()
   end
+
+  def validate_fields(changeset, remote? \\ false) do
+    limit_name = if remote?, do: :max_remote_account_fields, else: :max_account_fields
+    limit = Pleroma.Config.get([:instance, limit_name], 0)
+
+    changeset
+    |> validate_length(:fields, max: limit)
+    |> validate_change(:fields, fn :fields, fields ->
+      if Enum.all?(fields, &valid_field?/1) do
+        []
+      else
+        [fields: "invalid"]
+      end
+    end)
+  end
+
+  defp valid_field?(%{"name" => name, "value" => value}) do
+    name_limit = Pleroma.Config.get([:instance, :account_field_name_length], 255)
+    value_limit = Pleroma.Config.get([:instance, :account_field_value_length], 255)
+
+    is_binary(name) &&
+      is_binary(value) &&
+      String.length(name) <= name_limit &&
+      String.length(value) <= value_limit
+  end
+
+  defp valid_field?(_), do: false
 
   @spec confirmation_changeset(Info.t(), keyword()) :: Changeset.t()
   def confirmation_changeset(info, opts) do
@@ -319,5 +418,30 @@ defmodule Pleroma.User.Info do
     params = %{muted_reblogs: List.delete(info.muted_reblogs, ap_id)}
 
     cast(info, params, [:muted_reblogs])
+  end
+
+  # ``fields`` is an array of mastodon profile field, containing ``{"name": "…", "value": "…"}``.
+  # For example: [{"name": "Pronoun", "value": "she/her"}, …]
+  def fields(%{fields: nil, source_data: %{"attachment" => attachment}}) do
+    limit = Pleroma.Config.get([:instance, :max_remote_account_fields], 0)
+
+    attachment
+    |> Enum.filter(fn %{"type" => t} -> t == "PropertyValue" end)
+    |> Enum.map(fn fields -> Map.take(fields, ["name", "value"]) end)
+    |> Enum.take(limit)
+  end
+
+  def fields(%{fields: nil}), do: []
+
+  def fields(%{fields: fields}), do: fields
+
+  def follow_information_update(info, params) do
+    info
+    |> cast(params, [
+      :hide_followers,
+      :hide_follows,
+      :follower_count,
+      :following_count
+    ])
   end
 end

@@ -123,11 +123,26 @@ defmodule Pleroma.Web.Salmon do
     {:ok, salmon}
   end
 
-  def remote_users(%{data: %{"to" => to} = data}) do
-    to = to ++ (data["cc"] || [])
+  def remote_users(%User{id: user_id}, %{data: %{"to" => to} = data}) do
+    cc = Map.get(data, "cc", [])
 
-    to
-    |> Enum.map(fn id -> User.get_cached_by_ap_id(id) end)
+    bcc =
+      data
+      |> Map.get("bcc", [])
+      |> Enum.reduce([], fn ap_id, bcc ->
+        case Pleroma.List.get_by_ap_id(ap_id) do
+          %Pleroma.List{user_id: ^user_id} = list ->
+            {:ok, following} = Pleroma.List.get_following(list)
+            bcc ++ Enum.map(following, & &1.ap_id)
+
+          _ ->
+            bcc
+        end
+      end)
+
+    [to, cc, bcc]
+    |> Enum.concat()
+    |> Enum.map(&User.get_cached_by_ap_id/1)
     |> Enum.filter(fn user -> user && !user.local end)
   end
 
@@ -178,7 +193,7 @@ defmodule Pleroma.Web.Salmon do
   @spec publish(User.t(), Pleroma.Activity.t()) :: none
   def publish(user, activity)
 
-  def publish(%{info: %{keys: keys}} = user, %{data: %{"type" => type}} = activity)
+  def publish(%{keys: keys} = user, %{data: %{"type" => type}} = activity)
       when type in @supported_activities do
     feed = ActivityRepresenter.to_simple_form(activity, user, true)
 
@@ -191,7 +206,7 @@ defmodule Pleroma.Web.Salmon do
       {:ok, private, _} = Keys.keys_from_pem(keys)
       {:ok, feed} = encode(private, feed)
 
-      remote_users = remote_users(activity)
+      remote_users = remote_users(user, activity)
 
       salmon_urls = Enum.map(remote_users, & &1.info.salmon)
       reachable_urls_metadata = Instances.filter_reachable(salmon_urls)
@@ -214,7 +229,7 @@ defmodule Pleroma.Web.Salmon do
   def publish(%{id: id}, _), do: Logger.debug(fn -> "Keys missing for user #{id}" end)
 
   def gather_webfinger_links(%User{} = user) do
-    {:ok, _private, public} = Keys.keys_from_pem(user.info.keys)
+    {:ok, _private, public} = Keys.keys_from_pem(user.keys)
     magic_key = encode_key(public)
 
     [

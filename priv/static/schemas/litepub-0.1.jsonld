@@ -13,13 +13,16 @@
             },
             "manuallyApprovesFollowers": "as:manuallyApprovesFollowers",
             "ostatus": "http://ostatus.org#",
-            "schema": "http://schema.org",
+            "schema": "http://schema.org#",
             "toot": "http://joinmastodon.org/ns#",
-            "totalItems": "as:totalItems",
             "value": "schema:value",
             "sensitive": "as:sensitive",
             "litepub": "http://litepub.social/ns#",
             "directMessage": "litepub:directMessage",
+            "listMessage": {
+                "@id": "litepub:listMessage",
+                "@type": "@id"
+            },
             "oauthRegistrationEndpoint": {
                 "@id": "litepub:oauthRegistrationEndpoint",
                 "@type": "@id"

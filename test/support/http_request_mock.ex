@@ -17,9 +17,12 @@ defmodule HttpRequestMock do
     with {:ok, res} <- apply(__MODULE__, method, [url, query, body, headers]) do
       res
     else
-      {_, _r} = error ->
-        # Logger.warn(r)
-        error
+      error ->
+        with {:error, message} <- error do
+          Logger.warn(message)
+        end
+
+        {_, _r} = error
     end
   end
 
@@ -31,8 +34,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body:
-         File.read!("test/fixtures/httpoison_mock/https___osada.macgirvin.com_channel_mike.json")
+       body: File.read!("test/fixtures/tesla_mock/https___osada.macgirvin.com_channel_mike.json")
      }}
   end
 
@@ -40,7 +42,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/status.emelie.json")
+       body: File.read!("test/fixtures/tesla_mock/status.emelie.json")
      }}
   end
 
@@ -48,15 +50,19 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/emelie.json")
+       body: File.read!("test/fixtures/tesla_mock/emelie.json")
      }}
+  end
+
+  def get("https://mastodon.social/users/not_found", _, _, _) do
+    {:ok, %Tesla.Env{status: 404}}
   end
 
   def get("https://mastodon.sdf.org/users/rinpatch", _, _, _) do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/rinpatch.json")
+       body: File.read!("test/fixtures/tesla_mock/rinpatch.json")
      }}
   end
 
@@ -69,7 +75,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/webfinger_emelie.json")
+       body: File.read!("test/fixtures/tesla_mock/webfinger_emelie.json")
      }}
   end
 
@@ -77,7 +83,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/emelie.atom")
+       body: File.read!("test/fixtures/tesla_mock/emelie.atom")
      }}
   end
 
@@ -90,7 +96,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/mike@osada.macgirvin.com.json")
+       body: File.read!("test/fixtures/tesla_mock/mike@osada.macgirvin.com.json")
      }}
   end
 
@@ -103,7 +109,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/https___social.heldscal.la_user_29191.xml")
+       body: File.read!("test/fixtures/tesla_mock/https___social.heldscal.la_user_29191.xml")
      }}
   end
 
@@ -111,7 +117,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/https___pawoo.net_users_pekorino.atom")
+       body: File.read!("test/fixtures/tesla_mock/https___pawoo.net_users_pekorino.atom")
      }}
   end
 
@@ -124,7 +130,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/https___pawoo.net_users_pekorino.xml")
+       body: File.read!("test/fixtures/tesla_mock/https___pawoo.net_users_pekorino.xml")
      }}
   end
 
@@ -137,7 +143,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/atarifrosch_feed.xml")
+       body: File.read!("test/fixtures/tesla_mock/atarifrosch_feed.xml")
      }}
   end
 
@@ -150,7 +156,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/atarifrosch_webfinger.xml")
+       body: File.read!("test/fixtures/tesla_mock/atarifrosch_webfinger.xml")
      }}
   end
 
@@ -158,7 +164,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/https___mamot.fr_users_Skruyb.atom")
+       body: File.read!("test/fixtures/tesla_mock/https___mamot.fr_users_Skruyb.atom")
      }}
   end
 
@@ -171,7 +177,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/skruyb@mamot.fr.atom")
+       body: File.read!("test/fixtures/tesla_mock/skruyb@mamot.fr.atom")
      }}
   end
 
@@ -184,7 +190,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/nonexistant@social.heldscal.la.xml")
+       body: File.read!("test/fixtures/tesla_mock/nonexistant@social.heldscal.la.xml")
      }}
   end
 
@@ -197,7 +203,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/lain_squeet.me_webfinger.xml")
+       body: File.read!("test/fixtures/tesla_mock/lain_squeet.me_webfinger.xml")
      }}
   end
 
@@ -210,7 +216,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/lucifermysticus.json")
+       body: File.read!("test/fixtures/tesla_mock/lucifermysticus.json")
      }}
   end
 
@@ -218,7 +224,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/https___prismo.news__mxb.json")
+       body: File.read!("test/fixtures/tesla_mock/https___prismo.news__mxb.json")
      }}
   end
 
@@ -231,7 +237,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/kaniini@hubzilla.example.org.json")
+       body: File.read!("test/fixtures/tesla_mock/kaniini@hubzilla.example.org.json")
      }}
   end
 
@@ -239,7 +245,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/rye.json")
+       body: File.read!("test/fixtures/tesla_mock/rye.json")
      }}
   end
 
@@ -247,7 +253,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/rye.json")
+       body: File.read!("test/fixtures/tesla_mock/rye.json")
      }}
   end
 
@@ -257,7 +263,7 @@ defmodule HttpRequestMock do
        status: 200,
        body:
          File.read!(
-           "test/fixtures/httpoison_mock/http___mastodon.example.org_users_admin_status_1234.json"
+           "test/fixtures/tesla_mock/http___mastodon.example.org_users_admin_status_1234.json"
          )
      }}
   end
@@ -266,7 +272,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/puckipedia.com.json")
+       body: File.read!("test/fixtures/tesla_mock/puckipedia.com.json")
      }}
   end
 
@@ -274,7 +280,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/7even.json")
+       body: File.read!("test/fixtures/tesla_mock/7even.json")
      }}
   end
 
@@ -282,7 +288,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/peertube.moe-vid.json")
+       body: File.read!("test/fixtures/tesla_mock/peertube.moe-vid.json")
      }}
   end
 
@@ -290,7 +296,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/baptiste.gelex.xyz-user.json")
+       body: File.read!("test/fixtures/tesla_mock/baptiste.gelex.xyz-user.json")
      }}
   end
 
@@ -298,7 +304,23 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/baptiste.gelex.xyz-article.json")
+       body: File.read!("test/fixtures/tesla_mock/baptiste.gelex.xyz-article.json")
+     }}
+  end
+
+  def get("https://wedistribute.org/wp-json/pterotype/v1/object/85810", _, _, _) do
+    {:ok,
+     %Tesla.Env{
+       status: 200,
+       body: File.read!("test/fixtures/tesla_mock/wedistribute-article.json")
+     }}
+  end
+
+  def get("https://wedistribute.org/wp-json/pterotype/v1/actor/-blog", _, _, _) do
+    {:ok,
+     %Tesla.Env{
+       status: 200,
+       body: File.read!("test/fixtures/tesla_mock/wedistribute-user.json")
      }}
   end
 
@@ -306,7 +328,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/admin@mastdon.example.org.json")
+       body: File.read!("test/fixtures/tesla_mock/admin@mastdon.example.org.json")
      }}
   end
 
@@ -331,7 +353,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/7369654.html")
+       body: File.read!("test/fixtures/tesla_mock/7369654.html")
      }}
   end
 
@@ -339,7 +361,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/mayumayu.json")
+       body: File.read!("test/fixtures/tesla_mock/mayumayu.json")
      }}
   end
 
@@ -352,7 +374,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/mayumayupost.json")
+       body: File.read!("test/fixtures/tesla_mock/mayumayupost.json")
      }}
   end
 
@@ -362,7 +384,7 @@ defmodule HttpRequestMock do
        status: 200,
        body:
          File.read!(
-           "test/fixtures/httpoison_mock/https___pleroma.soykaf.com_users_lain_feed.atom.xml"
+           "test/fixtures/tesla_mock/https___pleroma.soykaf.com_users_lain_feed.atom.xml"
          )
      }}
   end
@@ -375,7 +397,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/https___pleroma.soykaf.com_users_lain.xml")
+       body: File.read!("test/fixtures/tesla_mock/https___pleroma.soykaf.com_users_lain.xml")
      }}
   end
 
@@ -385,7 +407,7 @@ defmodule HttpRequestMock do
        status: 200,
        body:
          File.read!(
-           "test/fixtures/httpoison_mock/https___shitposter.club_api_statuses_user_timeline_1.atom.xml"
+           "test/fixtures/tesla_mock/https___shitposter.club_api_statuses_user_timeline_1.atom.xml"
          )
      }}
   end
@@ -399,7 +421,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/https___shitposter.club_user_1.xml")
+       body: File.read!("test/fixtures/tesla_mock/https___shitposter.club_user_1.xml")
      }}
   end
 
@@ -407,8 +429,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body:
-         File.read!("test/fixtures/httpoison_mock/https___shitposter.club_notice_2827873.html")
+       body: File.read!("test/fixtures/tesla_mock/https___shitposter.club_notice_2827873.html")
      }}
   end
 
@@ -418,7 +439,7 @@ defmodule HttpRequestMock do
        status: 200,
        body:
          File.read!(
-           "test/fixtures/httpoison_mock/https___shitposter.club_api_statuses_show_2827873.atom.xml"
+           "test/fixtures/tesla_mock/https___shitposter.club_api_statuses_show_2827873.atom.xml"
          )
      }}
   end
@@ -431,7 +452,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/spc_5381.atom")
+       body: File.read!("test/fixtures/tesla_mock/spc_5381.atom")
      }}
   end
 
@@ -444,7 +465,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/spc_5381_xrd.xml")
+       body: File.read!("test/fixtures/tesla_mock/spc_5381_xrd.xml")
      }}
   end
 
@@ -452,7 +473,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/shitposter.club_host_meta")
+       body: File.read!("test/fixtures/tesla_mock/shitposter.club_host_meta")
      }}
   end
 
@@ -460,7 +481,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/7369654.atom")
+       body: File.read!("test/fixtures/tesla_mock/7369654.atom")
      }}
   end
 
@@ -468,7 +489,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/7369654.html")
+       body: File.read!("test/fixtures/tesla_mock/7369654.html")
      }}
   end
 
@@ -476,7 +497,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/sakamoto_eal_feed.atom")
+       body: File.read!("test/fixtures/tesla_mock/sakamoto_eal_feed.atom")
      }}
   end
 
@@ -484,7 +505,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/social.sakamoto.gq_host_meta")
+       body: File.read!("test/fixtures/tesla_mock/social.sakamoto.gq_host_meta")
      }}
   end
 
@@ -497,7 +518,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/eal_sakamoto.xml")
+       body: File.read!("test/fixtures/tesla_mock/eal_sakamoto.xml")
      }}
   end
 
@@ -507,14 +528,14 @@ defmodule HttpRequestMock do
         _,
         Accept: "application/atom+xml"
       ) do
-    {:ok, %Tesla.Env{status: 200, body: File.read!("test/fixtures/httpoison_mock/sakamoto.atom")}}
+    {:ok, %Tesla.Env{status: 200, body: File.read!("test/fixtures/tesla_mock/sakamoto.atom")}}
   end
 
   def get("http://mastodon.social/.well-known/host-meta", _, _, _) do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/mastodon.social_host_meta")
+       body: File.read!("test/fixtures/tesla_mock/mastodon.social_host_meta")
      }}
   end
 
@@ -528,9 +549,7 @@ defmodule HttpRequestMock do
      %Tesla.Env{
        status: 200,
        body:
-         File.read!(
-           "test/fixtures/httpoison_mock/https___mastodon.social_users_lambadalambda.xml"
-         )
+         File.read!("test/fixtures/tesla_mock/https___mastodon.social_users_lambadalambda.xml")
      }}
   end
 
@@ -538,7 +557,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/gs.example.org_host_meta")
+       body: File.read!("test/fixtures/tesla_mock/gs.example.org_host_meta")
      }}
   end
 
@@ -552,9 +571,7 @@ defmodule HttpRequestMock do
      %Tesla.Env{
        status: 200,
        body:
-         File.read!(
-           "test/fixtures/httpoison_mock/http___gs.example.org_4040_index.php_user_1.xml"
-         )
+         File.read!("test/fixtures/tesla_mock/http___gs.example.org_4040_index.php_user_1.xml")
      }}
   end
 
@@ -573,7 +590,7 @@ defmodule HttpRequestMock do
        status: 200,
        body:
          File.read!(
-           "test/fixtures/httpoison_mock/http__gs.example.org_index.php_api_statuses_user_timeline_1.atom.xml"
+           "test/fixtures/tesla_mock/http__gs.example.org_index.php_api_statuses_user_timeline_1.atom.xml"
          )
      }}
   end
@@ -584,14 +601,14 @@ defmodule HttpRequestMock do
        status: 200,
        body:
          File.read!(
-           "test/fixtures/httpoison_mock/https___social.heldscal.la_api_statuses_user_timeline_29191.atom.xml"
+           "test/fixtures/tesla_mock/https___social.heldscal.la_api_statuses_user_timeline_29191.atom.xml"
          )
      }}
   end
 
   def get("http://squeet.me/.well-known/host-meta", _, _, _) do
     {:ok,
-     %Tesla.Env{status: 200, body: File.read!("test/fixtures/httpoison_mock/squeet.me_host_meta")}}
+     %Tesla.Env{status: 200, body: File.read!("test/fixtures/tesla_mock/squeet.me_host_meta")}}
   end
 
   def get(
@@ -603,7 +620,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/lain_squeet.me_webfinger.xml")
+       body: File.read!("test/fixtures/tesla_mock/lain_squeet.me_webfinger.xml")
      }}
   end
 
@@ -616,15 +633,24 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/shp@social.heldscal.la.xml")
+       body: File.read!("test/fixtures/tesla_mock/shp@social.heldscal.la.xml")
      }}
+  end
+
+  def get(
+        "https://social.heldscal.la/.well-known/webfinger?resource=invalid_content@social.heldscal.la",
+        _,
+        _,
+        Accept: "application/xrd+xml,application/jrd+json"
+      ) do
+    {:ok, %Tesla.Env{status: 200, body: ""}}
   end
 
   def get("http://framatube.org/.well-known/host-meta", _, _, _) do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/framatube.org_host_meta")
+       body: File.read!("test/fixtures/tesla_mock/framatube.org_host_meta")
      }}
   end
 
@@ -638,7 +664,7 @@ defmodule HttpRequestMock do
      %Tesla.Env{
        status: 200,
        headers: [{"content-type", "application/json"}],
-       body: File.read!("test/fixtures/httpoison_mock/framasoft@framatube.org.json")
+       body: File.read!("test/fixtures/tesla_mock/framasoft@framatube.org.json")
      }}
   end
 
@@ -646,7 +672,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/gnusocial.de_host_meta")
+       body: File.read!("test/fixtures/tesla_mock/gnusocial.de_host_meta")
      }}
   end
 
@@ -659,7 +685,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/winterdienst_webfinger.json")
+       body: File.read!("test/fixtures/tesla_mock/winterdienst_webfinger.json")
      }}
   end
 
@@ -667,7 +693,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/status.alpicola.com_host_meta")
+       body: File.read!("test/fixtures/tesla_mock/status.alpicola.com_host_meta")
      }}
   end
 
@@ -675,7 +701,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/macgirvin.com_host_meta")
+       body: File.read!("test/fixtures/tesla_mock/macgirvin.com_host_meta")
      }}
   end
 
@@ -683,7 +709,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/gerzilla.de_host_meta")
+       body: File.read!("test/fixtures/tesla_mock/gerzilla.de_host_meta")
      }}
   end
 
@@ -697,7 +723,7 @@ defmodule HttpRequestMock do
      %Tesla.Env{
        status: 200,
        headers: [{"content-type", "application/json"}],
-       body: File.read!("test/fixtures/httpoison_mock/kaniini@gerzilla.de.json")
+       body: File.read!("test/fixtures/tesla_mock/kaniini@gerzilla.de.json")
      }}
   end
 
@@ -707,7 +733,7 @@ defmodule HttpRequestMock do
        status: 200,
        body:
          File.read!(
-           "test/fixtures/httpoison_mock/https___social.heldscal.la_api_statuses_user_timeline_23211.atom.xml"
+           "test/fixtures/tesla_mock/https___social.heldscal.la_api_statuses_user_timeline_23211.atom.xml"
          )
      }}
   end
@@ -721,7 +747,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/https___social.heldscal.la_user_23211.xml")
+       body: File.read!("test/fixtures/tesla_mock/https___social.heldscal.la_user_23211.xml")
      }}
   end
 
@@ -729,7 +755,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/social.heldscal.la_host_meta")
+       body: File.read!("test/fixtures/tesla_mock/social.heldscal.la_host_meta")
      }}
   end
 
@@ -737,7 +763,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/social.heldscal.la_host_meta")
+       body: File.read!("test/fixtures/tesla_mock/social.heldscal.la_host_meta")
      }}
   end
 
@@ -747,6 +773,11 @@ defmodule HttpRequestMock do
 
   def get("https://mastodon.social/users/lambadalambda", _, _, _) do
     {:ok, %Tesla.Env{status: 200, body: File.read!("test/fixtures/lambadalambda.json")}}
+  end
+
+  def get("https://apfed.club/channel/indio", _, _, _) do
+    {:ok,
+     %Tesla.Env{status: 200, body: File.read!("test/fixtures/tesla_mock/osada-user-indio.json")}}
   end
 
   def get("https://social.heldscal.la/user/23211", _, _, Accept: "application/activity+json") do
@@ -763,6 +794,70 @@ defmodule HttpRequestMock do
 
   def get("https://pleroma.local/notice/9kCP7V", _, _, _) do
     {:ok, %Tesla.Env{status: 200, body: File.read!("test/fixtures/rich_media/ogp.html")}}
+  end
+
+  def get("http://localhost:4001/users/masto_closed/followers", _, _, _) do
+    {:ok,
+     %Tesla.Env{
+       status: 200,
+       body: File.read!("test/fixtures/users_mock/masto_closed_followers.json")
+     }}
+  end
+
+  def get("http://localhost:4001/users/masto_closed/followers?page=1", _, _, _) do
+    {:ok,
+     %Tesla.Env{
+       status: 200,
+       body: File.read!("test/fixtures/users_mock/masto_closed_followers_page.json")
+     }}
+  end
+
+  def get("http://localhost:4001/users/masto_closed/following", _, _, _) do
+    {:ok,
+     %Tesla.Env{
+       status: 200,
+       body: File.read!("test/fixtures/users_mock/masto_closed_following.json")
+     }}
+  end
+
+  def get("http://localhost:4001/users/masto_closed/following?page=1", _, _, _) do
+    {:ok,
+     %Tesla.Env{
+       status: 200,
+       body: File.read!("test/fixtures/users_mock/masto_closed_following_page.json")
+     }}
+  end
+
+  def get("http://localhost:4001/users/fuser2/followers", _, _, _) do
+    {:ok,
+     %Tesla.Env{
+       status: 200,
+       body: File.read!("test/fixtures/users_mock/pleroma_followers.json")
+     }}
+  end
+
+  def get("http://localhost:4001/users/fuser2/following", _, _, _) do
+    {:ok,
+     %Tesla.Env{
+       status: 200,
+       body: File.read!("test/fixtures/users_mock/pleroma_following.json")
+     }}
+  end
+
+  def get("http://domain-with-errors:4001/users/fuser1/followers", _, _, _) do
+    {:ok,
+     %Tesla.Env{
+       status: 504,
+       body: ""
+     }}
+  end
+
+  def get("http://domain-with-errors:4001/users/fuser1/following", _, _, _) do
+    {:ok,
+     %Tesla.Env{
+       status: 504,
+       body: ""
+     }}
   end
 
   def get("http://example.com/ogp-missing-data", _, _, _) do
@@ -841,7 +936,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/https__info.pleroma.site_activity.json")
+       body: File.read!("test/fixtures/tesla_mock/https__info.pleroma.site_activity.json")
      }}
   end
 
@@ -853,7 +948,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/https__info.pleroma.site_activity2.json")
+       body: File.read!("test/fixtures/tesla_mock/https__info.pleroma.site_activity2.json")
      }}
   end
 
@@ -865,7 +960,7 @@ defmodule HttpRequestMock do
     {:ok,
      %Tesla.Env{
        status: 200,
-       body: File.read!("test/fixtures/httpoison_mock/https__info.pleroma.site_activity3.json")
+       body: File.read!("test/fixtures/tesla_mock/https__info.pleroma.site_activity3.json")
      }}
   end
 
@@ -873,9 +968,49 @@ defmodule HttpRequestMock do
     {:ok, %Tesla.Env{status: 404, body: ""}}
   end
 
+  def get("https://mstdn.jp/.well-known/webfinger?resource=acct:kpherox@mstdn.jp", _, _, _) do
+    {:ok,
+     %Tesla.Env{
+       status: 200,
+       body: File.read!("test/fixtures/tesla_mock/kpherox@mstdn.jp.xml")
+     }}
+  end
+
+  def get("http://example.com/rel_me/anchor", _, _, _) do
+    {:ok, %Tesla.Env{status: 200, body: File.read!("test/fixtures/rel_me_anchor.html")}}
+  end
+
+  def get("http://example.com/rel_me/anchor_nofollow", _, _, _) do
+    {:ok, %Tesla.Env{status: 200, body: File.read!("test/fixtures/rel_me_anchor_nofollow.html")}}
+  end
+
+  def get("http://example.com/rel_me/link", _, _, _) do
+    {:ok, %Tesla.Env{status: 200, body: File.read!("test/fixtures/rel_me_link.html")}}
+  end
+
+  def get("http://example.com/rel_me/null", _, _, _) do
+    {:ok, %Tesla.Env{status: 200, body: File.read!("test/fixtures/rel_me_null.html")}}
+  end
+
+  def get("https://skippers-bin.com/notes/7x9tmrp97i", _, _, _) do
+    {:ok,
+     %Tesla.Env{
+       status: 200,
+       body: File.read!("test/fixtures/tesla_mock/misskey_poll_no_end_date.json")
+     }}
+  end
+
+  def get("https://skippers-bin.com/users/7v1w1r8ce6", _, _, _) do
+    {:ok, %Tesla.Env{status: 200, body: File.read!("test/fixtures/tesla_mock/sjw.json")}}
+  end
+
+  def get("https://patch.cx/users/rin", _, _, _) do
+    {:ok, %Tesla.Env{status: 200, body: File.read!("test/fixtures/tesla_mock/rin.json")}}
+  end
+
   def get(url, query, body, headers) do
     {:error,
-     "Not implemented the mock response for get #{inspect(url)}, #{query}, #{inspect(body)}, #{
+     "Mock response not implemented for GET #{inspect(url)}, #{query}, #{inspect(body)}, #{
        inspect(headers)
      }"}
   end
@@ -937,7 +1072,10 @@ defmodule HttpRequestMock do
      }}
   end
 
-  def post(url, _query, _body, _headers) do
-    {:error, "Not implemented the mock response for post #{inspect(url)}"}
+  def post(url, query, body, headers) do
+    {:error,
+     "Mock response not implemented for POST #{inspect(url)}, #{query}, #{inspect(body)}, #{
+       inspect(headers)
+     }"}
   end
 end

@@ -1,8 +1,8 @@
 # How to activate mediaproxy
 ## Explanation
 
-Without the `mediaproxy` function, Pleroma don't store any remote content like pictures, video etc. locally. So every time you open Pleroma, the content is loaded from the source server, from where the post is coming. This can result in slowly loading content or/and increased bandwidth usage on the source server.
-With the `mediaproxy` function you can use the cache ability of nginx, to cache these content, so user can access it faster, cause it's loaded from your server.
+Without the `mediaproxy` function, Pleroma doesn't store any remote content like pictures, video etc. locally. So every time you open Pleroma, the content is loaded from the source server, from where the post is coming. This can result in slowly loading content or/and increased bandwidth usage on the source server.
+With the `mediaproxy` function you can use nginx to cache this content, so users can access it faster, because it's loaded from your server.
 
 ## Activate it
 
@@ -24,7 +24,9 @@ If you came here from one of the installation guides, take a look at the example
 ```
 config :pleroma, :media_proxy,
       enabled: true,
-      redirect_on_failure: true
+      proxy_opts: [
+            redirect_on_failure: true
+      ]
       #base_url: "https://cache.pleroma.social"
 ```
 If you want to use a subdomain to serve the files, uncomment `base_url`, change the url and add a comma after `true` in the previous line.

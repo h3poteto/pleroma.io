@@ -126,13 +126,14 @@ Request parameters can be passed via [query strings](https://en.wikipedia.org/wi
 ## `/api/pleroma/admin/`…
 See [Admin-API](Admin-API.md)
 
-## `/api/pleroma/notifications/read`
-### Mark a single notification as read
+## `/api/v1/pleroma/notifications/read`
+### Mark notifications as read
 * Method `POST`
 * Authentication: required
-* Params:
-    * `id`: notification's id
-* Response: JSON. Returns `{"status": "success"}` if the reading was successful, otherwise returns `{"error": "error_msg"}`
+* Params (mutually exclusive):
+    * `id`: a single notification id to read
+    * `max_id`: read all notifications up to this id
+* Response: Notification entity/Array of Notification entities that were read. In case of `max_id`, only the first 80 read notifications will be returned.
 
 ## `/api/v1/pleroma/accounts/:id/subscribe`
 ### Subscribe to receive notifications for all statuses posted by a user
@@ -238,6 +239,21 @@ See [Admin-API](Admin-API.md)
 ]
 ```
 
+## `/api/v1/pleroma/accounts/update_*`
+### Set and clear account avatar, banner, and background
+
+- PATCH `/api/v1/pleroma/accounts/update_avatar`: Set/clear user avatar image
+- PATCH `/api/v1/pleroma/accounts/update_banner`: Set/clear user banner image
+- PATCH `/api/v1/pleroma/accounts/update_background`: Set/clear user background image
+
+## `/api/v1/pleroma/accounts/confirmation_resend`
+### Resend confirmation email
+* Method `POST`
+* Params:
+    * `email`: email of that needs to be verified
+* Authentication: not required
+* Response: 204 No Content
+
 ## `/api/v1/pleroma/mascot`
 ### Gets user mascot image
 * Method `GET`
@@ -304,3 +320,48 @@ See [Admin-API](Admin-API.md)
   "healthy": true # Instance state
 }
 ```
+
+## `/api/pleroma/change_email`
+### Change account email
+* Method `POST`
+* Authentication: required
+* Params:
+    * `password`: user's password
+    * `email`: new email
+* Response: JSON. Returns `{"status": "success"}` if the change was successful, `{"error": "[error message]"}` otherwise
+* Note: Currently, Mastodon has no API for changing email. If they add it in future it might be incompatible with Pleroma.
+
+# Pleroma Conversations
+
+Pleroma Conversations have the same general structure that Mastodon Conversations have. The behavior differs in the following ways when using these endpoints:
+
+1. Pleroma Conversations never add or remove recipients, unless explicitly changed by the user.
+2. Pleroma Conversations statuses can be requested by Conversation id.
+3. Pleroma Conversations can be replied to.
+
+Conversations have the additional field "recipients" under the "pleroma" key. This holds a list of all the accounts that will receive a message in this conversation.
+
+The status posting endpoint takes an additional parameter, `in_reply_to_conversation_id`, which, when set, will set the visiblity to direct and address only the people who are the recipients of that Conversation.
+
+
+## `GET /api/v1/pleroma/conversations/:id/statuses`
+### Timeline for a given conversation
+* Method `GET`
+* Authentication: required
+* Params: Like other timelines
+* Response: JSON, statuses (200 - healthy, 503 unhealthy).
+
+## `GET /api/v1/pleroma/conversations/:id`
+### The conversation with the given ID.
+* Method `GET`
+* Authentication: required
+* Params: None
+* Response: JSON, statuses (200 - healthy, 503 unhealthy).
+
+## `PATCH /api/v1/pleroma/conversations/:id`
+### Update a conversation. Used to change the set of recipients.
+* Method `PATCH`
+* Authentication: required
+* Params:
+    * `recipients`: A list of ids of users that should receive posts to this conversation. This will replace the current list of recipients, so submit the full list. The owner of owner of the conversation will always be part of the set of recipients, though.
+* Response: JSON, statuses (200 - healthy, 503 unhealthy)

@@ -8,6 +8,7 @@ defmodule Mix.Tasks.Pleroma.Database do
   alias Pleroma.Repo
   alias Pleroma.User
   require Logger
+  require Pleroma.Constants
   import Mix.Pleroma
   use Mix.Task
 
@@ -53,7 +54,7 @@ defmodule Mix.Tasks.Pleroma.Database do
     Logger.info("Removing embedded objects")
 
     Repo.query!(
-      "update activities set data = jsonb_set(data, '{object}'::text[], data->'object'->'id') where data->'object'->>'id' is not null;",
+      "update activities set data = safe_jsonb_set(data, '{object}'::text[], data->'object'->'id') where data->'object'->>'id' is not null;",
       [],
       timeout: :infinity
     )
@@ -103,10 +104,15 @@ defmodule Mix.Tasks.Pleroma.Database do
       NaiveDateTime.utc_now()
       |> NaiveDateTime.add(-(deadline * 86_400))
 
-    public = "https://www.w3.org/ns/activitystreams#Public"
-
     from(o in Object,
-      where: fragment("?->'to' \\? ? OR ?->'cc' \\? ?", o.data, ^public, o.data, ^public),
+      where:
+        fragment(
+          "?->'to' \\? ? OR ?->'cc' \\? ?",
+          o.data,
+          ^Pleroma.Constants.as_public(),
+          o.data,
+          ^Pleroma.Constants.as_public()
+        ),
       where: o.inserted_at < ^time_deadline,
       where:
         fragment("split_part(?->>'actor', '/', 3) != ?", o.data, ^Pleroma.Web.Endpoint.host())
@@ -146,7 +152,7 @@ defmodule Mix.Tasks.Pleroma.Database do
         set: [
           data:
             fragment(
-              "jsonb_set(?, '{likes}', '[]'::jsonb, true)",
+              "safe_jsonb_set(?, '{likes}', '[]'::jsonb, true)",
               object.data
             )
         ]

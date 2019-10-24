@@ -3,11 +3,10 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 
 defmodule Pleroma.User.Search do
-  alias Pleroma.Repo
+  alias Pleroma.Pagination
   alias Pleroma.User
   import Ecto.Query
 
-  @similarity_threshold 0.25
   @limit 20
 
   def search(query_string, opts \\ []) do
@@ -18,61 +17,115 @@ defmodule Pleroma.User.Search do
 
     for_user = Keyword.get(opts, :for_user)
 
-    # Strip the beginning @ off if there is a query
-    query_string = String.trim_leading(query_string, "@")
+    query_string = format_query(query_string)
 
     maybe_resolve(resolve, for_user, query_string)
 
-    {:ok, results} =
-      Repo.transaction(fn ->
-        Ecto.Adapters.SQL.query(
-          Repo,
-          "select set_limit(#{@similarity_threshold})",
-          []
-        )
-
-        query_string
-        |> search_query(for_user, following)
-        |> paginate(result_limit, offset)
-        |> Repo.all()
-      end)
+    results =
+      query_string
+      |> search_query(for_user, following)
+      |> Pagination.fetch_paginated(%{"offset" => offset, "limit" => result_limit}, :offset)
 
     results
+  end
+
+  defp format_query(query_string) do
+    # Strip the beginning @ off if there is a query
+    query_string = String.trim_leading(query_string, "@")
+
+    with [name, domain] <- String.split(query_string, "@"),
+         formatted_domain <- String.replace(domain, ~r/[!-\-|@|[-`|{-~|\/|:|\s]+/, "") do
+      name <> "@" <> to_string(:idna.encode(formatted_domain))
+    else
+      _ -> query_string
+    end
   end
 
   defp search_query(query_string, for_user, following) do
     for_user
     |> base_query(following)
-    |> search_subqueries(query_string)
-    |> union_subqueries
-    |> distinct_query()
-    |> boost_search_rank_query(for_user)
+    |> filter_blocked_user(for_user)
+    |> filter_blocked_domains(for_user)
+    |> fts_search(query_string)
+    |> trigram_rank(query_string)
+    |> boost_search_rank(for_user)
     |> subquery()
     |> order_by(desc: :search_rank)
     |> maybe_restrict_local(for_user)
   end
 
+  @nickname_regex ~r/^[a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~\-@]+$/
+  defp fts_search(query, query_string) do
+    {nickname_weight, name_weight} =
+      if String.match?(query_string, @nickname_regex) do
+        {"A", "B"}
+      else
+        {"B", "A"}
+      end
+
+    query_string = to_tsquery(query_string)
+
+    from(
+      u in query,
+      where:
+        fragment(
+          """
+          (setweight(to_tsvector('simple', ?), ?) || setweight(to_tsvector('simple', ?), ?)) @@ to_tsquery('simple', ?)
+          """,
+          u.name,
+          ^name_weight,
+          u.nickname,
+          ^nickname_weight,
+          ^query_string
+        )
+    )
+  end
+
+  defp to_tsquery(query_string) do
+    String.trim_trailing(query_string, "@" <> local_domain())
+    |> String.replace(~r/[!-\/|@|[-`|{-~|:-?]+/, " ")
+    |> String.trim()
+    |> String.split()
+    |> Enum.map(&(&1 <> ":*"))
+    |> Enum.join(" | ")
+  end
+
+  defp trigram_rank(query, query_string) do
+    from(
+      u in query,
+      select_merge: %{
+        search_rank:
+          fragment(
+            "similarity(?, trim(? || ' ' || coalesce(?, '')))",
+            ^query_string,
+            u.nickname,
+            u.name
+          )
+      }
+    )
+  end
+
   defp base_query(_user, false), do: User
   defp base_query(user, true), do: User.get_followers_query(user)
 
-  defp paginate(query, limit, offset) do
-    from(q in query, limit: ^limit, offset: ^offset)
+  defp filter_blocked_user(query, %User{info: %{blocks: blocks}})
+       when length(blocks) > 0 do
+    from(q in query, where: not (q.ap_id in ^blocks))
   end
 
-  defp union_subqueries({fts_subquery, trigram_subquery}) do
-    from(s in trigram_subquery, union_all: ^fts_subquery)
+  defp filter_blocked_user(query, _), do: query
+
+  defp filter_blocked_domains(query, %User{info: %{domain_blocks: domain_blocks}})
+       when length(domain_blocks) > 0 do
+    domains = Enum.join(domain_blocks, ",")
+
+    from(
+      q in query,
+      where: fragment("substring(ap_id from '.*://([^/]*)') NOT IN (?)", ^domains)
+    )
   end
 
-  defp search_subqueries(base_query, query_string) do
-    {
-      fts_search_subquery(base_query, query_string),
-      trigram_search_subquery(base_query, query_string)
-    }
-  end
-
-  defp distinct_query(q) do
-    from(s in subquery(q), order_by: s.search_type, distinct: s.id)
-  end
+  defp filter_blocked_domains(query, _), do: query
 
   defp maybe_resolve(true, user, query) do
     case {limit(), user} do
@@ -98,9 +151,9 @@ defmodule Pleroma.User.Search do
 
   defp restrict_local(q), do: where(q, [u], u.local == true)
 
-  defp boost_search_rank_query(query, nil), do: query
+  defp local_domain, do: Pleroma.Config.get([Pleroma.Web.Endpoint, :url, :host])
 
-  defp boost_search_rank_query(query, for_user) do
+  defp boost_search_rank(query, %User{} = for_user) do
     friends_ids = User.get_friends_ids(for_user)
     followers_ids = User.get_followers_ids(for_user)
 
@@ -109,8 +162,8 @@ defmodule Pleroma.User.Search do
         search_rank:
           fragment(
             """
-             CASE WHEN (?) THEN 0.5 + (?) * 1.3
-             WHEN (?) THEN 0.5 + (?) * 1.2
+             CASE WHEN (?) THEN (?) * 1.5
+             WHEN (?) THEN (?) * 1.3
              WHEN (?) THEN (?) * 1.1
              ELSE (?) END
             """,
@@ -126,66 +179,5 @@ defmodule Pleroma.User.Search do
     )
   end
 
-  @spec fts_search_subquery(User.t() | Ecto.Query.t(), String.t()) :: Ecto.Query.t()
-  defp fts_search_subquery(query, term) do
-    processed_query =
-      term
-      |> String.replace(~r/\W+/, " ")
-      |> String.trim()
-      |> String.split()
-      |> Enum.map(&(&1 <> ":*"))
-      |> Enum.join(" | ")
-
-    from(
-      u in query,
-      select_merge: %{
-        search_type: ^0,
-        search_rank:
-          fragment(
-            """
-            ts_rank_cd(
-              setweight(to_tsvector('simple', regexp_replace(?, '\\W', ' ', 'g')), 'A') ||
-              setweight(to_tsvector('simple', regexp_replace(coalesce(?, ''), '\\W', ' ', 'g')), 'B'),
-              to_tsquery('simple', ?),
-              32
-            )
-            """,
-            u.nickname,
-            u.name,
-            ^processed_query
-          )
-      },
-      where:
-        fragment(
-          """
-            (setweight(to_tsvector('simple', regexp_replace(?, '\\W', ' ', 'g')), 'A') ||
-            setweight(to_tsvector('simple', regexp_replace(coalesce(?, ''), '\\W', ' ', 'g')), 'B')) @@ to_tsquery('simple', ?)
-          """,
-          u.nickname,
-          u.name,
-          ^processed_query
-        )
-    )
-    |> User.restrict_deactivated()
-  end
-
-  @spec trigram_search_subquery(User.t() | Ecto.Query.t(), String.t()) :: Ecto.Query.t()
-  defp trigram_search_subquery(query, term) do
-    from(
-      u in query,
-      select_merge: %{
-        # ^1 gives 'Postgrex expected a binary, got 1' for some weird reason
-        search_type: fragment("?", 1),
-        search_rank:
-          fragment(
-            "similarity(?, trim(? || ' ' || coalesce(?, '')))",
-            ^term,
-            u.nickname,
-            u.name
-          )
-      },
-      where: fragment("trim(? || ' ' || coalesce(?, '')) % ?", u.nickname, u.name, ^term)
-    )
-    |> User.restrict_deactivated()
-  end
+  defp boost_search_rank(query, _for_user), do: query
 end

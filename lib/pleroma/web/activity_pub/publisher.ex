@@ -11,6 +11,8 @@ defmodule Pleroma.Web.ActivityPub.Publisher do
   alias Pleroma.Web.ActivityPub.Relay
   alias Pleroma.Web.ActivityPub.Transmogrifier
 
+  require Pleroma.Constants
+
   import Pleroma.Web.ActivityPub.Visibility
 
   @behaviour Pleroma.Web.Federator.Publisher
@@ -48,9 +50,7 @@ defmodule Pleroma.Web.ActivityPub.Publisher do
 
     digest = "SHA-256=" <> (:crypto.hash(:sha256, json) |> Base.encode64())
 
-    date =
-      NaiveDateTime.utc_now()
-      |> Timex.format!("{WDshort}, {0D} {Mshort} {YYYY} {h24}:{m}:{s} GMT")
+    date = Pleroma.Signature.signed_date()
 
     signature =
       Pleroma.Signature.sign(actor, %{
@@ -98,18 +98,105 @@ defmodule Pleroma.Web.ActivityPub.Publisher do
     end
   end
 
+  @spec recipients(User.t(), Activity.t()) :: list(User.t()) | []
+  defp recipients(actor, activity) do
+    {:ok, followers} =
+      if actor.follower_address in activity.recipients do
+        User.get_external_followers(actor)
+      else
+        {:ok, []}
+      end
+
+    Pleroma.Web.Salmon.remote_users(actor, activity) ++ followers
+  end
+
+  defp get_cc_ap_ids(ap_id, recipients) do
+    host = Map.get(URI.parse(ap_id), :host)
+
+    recipients
+    |> Enum.filter(fn %User{ap_id: ap_id} -> Map.get(URI.parse(ap_id), :host) == host end)
+    |> Enum.map(& &1.ap_id)
+  end
+
+  defp maybe_use_sharedinbox(%User{info: %{source_data: data}}),
+    do: (is_map(data["endpoints"]) && Map.get(data["endpoints"], "sharedInbox")) || data["inbox"]
+
+  @doc """
+  Determine a user inbox to use based on heuristics.  These heuristics
+  are based on an approximation of the ``sharedInbox`` rules in the
+  [ActivityPub specification][ap-sharedinbox].
+
+  Please do not edit this function (or its children) without reading
+  the spec, as editing the code is likely to introduce some breakage
+  without some familiarity.
+
+     [ap-sharedinbox]: https://www.w3.org/TR/activitypub/#shared-inbox-delivery
+  """
+  def determine_inbox(
+        %Activity{data: activity_data},
+        %User{info: %{source_data: data}} = user
+      ) do
+    to = activity_data["to"] || []
+    cc = activity_data["cc"] || []
+    type = activity_data["type"]
+
+    cond do
+      type == "Delete" ->
+        maybe_use_sharedinbox(user)
+
+      Pleroma.Constants.as_public() in to || Pleroma.Constants.as_public() in cc ->
+        maybe_use_sharedinbox(user)
+
+      length(to) + length(cc) > 1 ->
+        maybe_use_sharedinbox(user)
+
+      true ->
+        data["inbox"]
+    end
+  end
+
+  @doc """
+  Publishes an activity with BCC to all relevant peers.
+  """
+
+  def publish(actor, %{data: %{"bcc" => bcc}} = activity) when is_list(bcc) and bcc != [] do
+    public = is_public?(activity)
+    {:ok, data} = Transmogrifier.prepare_outgoing(activity.data)
+
+    recipients = recipients(actor, activity)
+
+    recipients
+    |> Enum.filter(&User.ap_enabled?/1)
+    |> Enum.map(fn %{info: %{source_data: data}} -> data["inbox"] end)
+    |> Enum.filter(fn inbox -> should_federate?(inbox, public) end)
+    |> Instances.filter_reachable()
+    |> Enum.each(fn {inbox, unreachable_since} ->
+      %User{ap_id: ap_id} =
+        Enum.find(recipients, fn %{info: %{source_data: data}} -> data["inbox"] == inbox end)
+
+      # Get all the recipients on the same host and add them to cc. Otherwise, a remote
+      # instance would only accept a first message for the first recipient and ignore the rest.
+      cc = get_cc_ap_ids(ap_id, recipients)
+
+      json =
+        data
+        |> Map.put("cc", cc)
+        |> Jason.encode!()
+
+      Pleroma.Web.Federator.Publisher.enqueue_one(__MODULE__, %{
+        inbox: inbox,
+        json: json,
+        actor: actor,
+        id: activity.data["id"],
+        unreachable_since: unreachable_since
+      })
+    end)
+  end
+
   @doc """
   Publishes an activity to all relevant peers.
   """
   def publish(%User{} = actor, %Activity{} = activity) do
-    remote_followers =
-      if actor.follower_address in activity.recipients do
-        {:ok, followers} = User.get_followers(actor)
-        followers |> Enum.filter(&(!&1.local))
-      else
-        []
-      end
-
     public = is_public?(activity)
 
     if public && Config.get([:instance, :allow_relay]) do
@@ -120,10 +207,10 @@ defmodule Pleroma.Web.ActivityPub.Publisher do
     {:ok, data} = Transmogrifier.prepare_outgoing(activity.data)
     json = Jason.encode!(data)
 
-    (Pleroma.Web.Salmon.remote_users(activity) ++ remote_followers)
+    recipients(actor, activity)
     |> Enum.filter(fn user -> User.ap_enabled?(user) end)
-    |> Enum.map(fn %{info: %{source_data: data}} ->
-      (is_map(data["endpoints"]) && Map.get(data["endpoints"], "sharedInbox")) || data["inbox"]
+    |> Enum.map(fn %User{} = user ->
+      determine_inbox(activity, user)
     end)
     |> Enum.uniq()
     |> Enum.filter(fn inbox -> should_federate?(inbox, public) end)

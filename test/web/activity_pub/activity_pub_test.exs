@@ -6,11 +6,9 @@ defmodule Pleroma.Web.ActivityPub.ActivityPubTest do
   use Pleroma.DataCase
   alias Pleroma.Activity
   alias Pleroma.Builders.ActivityBuilder
-  alias Pleroma.Instances
   alias Pleroma.Object
   alias Pleroma.User
   alias Pleroma.Web.ActivityPub.ActivityPub
-  alias Pleroma.Web.ActivityPub.Publisher
   alias Pleroma.Web.ActivityPub.Utils
   alias Pleroma.Web.CommonAPI
 
@@ -22,6 +20,8 @@ defmodule Pleroma.Web.ActivityPub.ActivityPubTest do
     mock(fn env -> apply(HttpRequestMock, :request, [env]) end)
     :ok
   end
+
+  clear_config([:instance, :federating])
 
   describe "streaming out participations" do
     test "it streams them out" do
@@ -38,9 +38,7 @@ defmodule Pleroma.Web.ActivityPub.ActivityPubTest do
         stream: fn _, _ -> nil end do
         ActivityPub.stream_out_participations(conversation.participations)
 
-        Enum.each(participations, fn participation ->
-          assert called(Pleroma.Web.Streamer.stream("participation", participation))
-        end)
+        assert called(Pleroma.Web.Streamer.stream("participation", participations))
       end
     end
   end
@@ -254,10 +252,8 @@ defmodule Pleroma.Web.ActivityPub.ActivityPubTest do
       }
 
       {:ok, %Activity{} = activity} = ActivityPub.insert(data)
-      object = Object.normalize(activity.data["object"])
-
+      assert object = Object.normalize(activity)
       assert is_binary(object.data["id"])
-      assert %Object{} = Object.get_by_ap_id(activity.data["object"])
     end
   end
 
@@ -542,6 +538,29 @@ defmodule Pleroma.Web.ActivityPub.ActivityPubTest do
     assert Enum.member?(activities, activity_one)
   end
 
+  test "doesn't return thread muted activities" do
+    user = insert(:user)
+    _activity_one = insert(:note_activity)
+    note_two = insert(:note, data: %{"context" => "suya.."})
+    activity_two = insert(:note_activity, note: note_two)
+
+    {:ok, _activity_two} = CommonAPI.add_mute(user, activity_two)
+
+    assert [_activity_one] = ActivityPub.fetch_activities([], %{"muting_user" => user})
+  end
+
+  test "returns thread muted activities when with_muted is set" do
+    user = insert(:user)
+    _activity_one = insert(:note_activity)
+    note_two = insert(:note, data: %{"context" => "suya.."})
+    activity_two = insert(:note_activity, note: note_two)
+
+    {:ok, _activity_two} = CommonAPI.add_mute(user, activity_two)
+
+    assert [_activity_two, _activity_one] =
+             ActivityPub.fetch_activities([], %{"muting_user" => user, "with_muted" => true})
+  end
+
   test "does include announces on request" do
     activity_three = insert(:note_activity)
     user = insert(:user)
@@ -657,9 +676,33 @@ defmodule Pleroma.Web.ActivityPub.ActivityPubTest do
   end
 
   describe "like an object" do
+    test_with_mock "sends an activity to federation", Pleroma.Web.Federator, [:passthrough], [] do
+      Pleroma.Config.put([:instance, :federating], true)
+      note_activity = insert(:note_activity)
+      assert object_activity = Object.normalize(note_activity)
+
+      user = insert(:user)
+
+      {:ok, like_activity, _object} = ActivityPub.like(user, object_activity)
+      assert called(Pleroma.Web.Federator.publish(like_activity, 5))
+    end
+
+    test "returns exist activity if object already liked" do
+      note_activity = insert(:note_activity)
+      assert object_activity = Object.normalize(note_activity)
+
+      user = insert(:user)
+
+      {:ok, like_activity, _object} = ActivityPub.like(user, object_activity)
+
+      {:ok, like_activity_exist, _object} = ActivityPub.like(user, object_activity)
+      assert like_activity == like_activity_exist
+    end
+
     test "adds a like activity to the db" do
       note_activity = insert(:note_activity)
-      object = Object.get_by_ap_id(note_activity.data["object"]["id"])
+      assert object = Object.normalize(note_activity)
+
       user = insert(:user)
       user_two = insert(:user)
 
@@ -678,6 +721,7 @@ defmodule Pleroma.Web.ActivityPub.ActivityPubTest do
 
       assert like_activity == same_like_activity
       assert object.data["likes"] == [user.ap_id]
+      assert object.data["like_count"] == 1
 
       {:ok, _like_activity, object} = ActivityPub.like(user_two, object)
       assert object.data["like_count"] == 2
@@ -685,9 +729,28 @@ defmodule Pleroma.Web.ActivityPub.ActivityPubTest do
   end
 
   describe "unliking" do
+    test_with_mock "sends an activity to federation", Pleroma.Web.Federator, [:passthrough], [] do
+      Pleroma.Config.put([:instance, :federating], true)
+
+      note_activity = insert(:note_activity)
+      object = Object.normalize(note_activity)
+      user = insert(:user)
+
+      {:ok, object} = ActivityPub.unlike(user, object)
+      refute called(Pleroma.Web.Federator.publish())
+
+      {:ok, _like_activity, object} = ActivityPub.like(user, object)
+      assert object.data["like_count"] == 1
+
+      {:ok, unlike_activity, _, object} = ActivityPub.unlike(user, object)
+      assert object.data["like_count"] == 0
+
+      assert called(Pleroma.Web.Federator.publish(unlike_activity, 5))
+    end
+
     test "unliking a previously liked object" do
       note_activity = insert(:note_activity)
-      object = Object.get_by_ap_id(note_activity.data["object"]["id"])
+      object = Object.normalize(note_activity)
       user = insert(:user)
 
       # Unliking something that hasn't been liked does nothing
@@ -697,17 +760,18 @@ defmodule Pleroma.Web.ActivityPub.ActivityPubTest do
       {:ok, like_activity, object} = ActivityPub.like(user, object)
       assert object.data["like_count"] == 1
 
-      {:ok, _, _, object} = ActivityPub.unlike(user, object)
+      {:ok, unlike_activity, _, object} = ActivityPub.unlike(user, object)
       assert object.data["like_count"] == 0
 
       assert Activity.get_by_id(like_activity.id) == nil
+      assert note_activity.actor in unlike_activity.recipients
     end
   end
 
   describe "announcing an object" do
     test "adds an announce activity to the db" do
       note_activity = insert(:note_activity)
-      object = Object.get_by_ap_id(note_activity.data["object"]["id"])
+      object = Object.normalize(note_activity)
       user = insert(:user)
 
       {:ok, announce_activity, object} = ActivityPub.announce(user, object)
@@ -728,7 +792,7 @@ defmodule Pleroma.Web.ActivityPub.ActivityPubTest do
   describe "unannouncing an object" do
     test "unannouncing a previously announced object" do
       note_activity = insert(:note_activity)
-      object = Object.get_by_ap_id(note_activity.data["object"]["id"])
+      object = Object.normalize(note_activity)
       user = insert(:user)
 
       # Unannouncing an object that is not announced does nothing
@@ -743,7 +807,7 @@ defmodule Pleroma.Web.ActivityPub.ActivityPubTest do
 
       assert unannounce_activity.data["to"] == [
                User.ap_followers(user),
-               announce_activity.data["actor"]
+               object.data["actor"]
              ]
 
       assert unannounce_activity.data["type"] == "Undo"
@@ -807,10 +871,11 @@ defmodule Pleroma.Web.ActivityPub.ActivityPubTest do
       assert activity.data["type"] == "Undo"
       assert activity.data["actor"] == follower.ap_id
 
-      assert is_map(activity.data["object"])
-      assert activity.data["object"]["type"] == "Follow"
-      assert activity.data["object"]["object"] == followed.ap_id
-      assert activity.data["object"]["id"] == follow_activity.data["id"]
+      embedded_object = activity.data["object"]
+      assert is_map(embedded_object)
+      assert embedded_object["type"] == "Follow"
+      assert embedded_object["object"] == followed.ap_id
+      assert embedded_object["id"] == follow_activity.data["id"]
     end
   end
 
@@ -836,22 +901,23 @@ defmodule Pleroma.Web.ActivityPub.ActivityPubTest do
       assert activity.data["type"] == "Undo"
       assert activity.data["actor"] == blocker.ap_id
 
-      assert is_map(activity.data["object"])
-      assert activity.data["object"]["type"] == "Block"
-      assert activity.data["object"]["object"] == blocked.ap_id
-      assert activity.data["object"]["id"] == block_activity.data["id"]
+      embedded_object = activity.data["object"]
+      assert is_map(embedded_object)
+      assert embedded_object["type"] == "Block"
+      assert embedded_object["object"] == blocked.ap_id
+      assert embedded_object["id"] == block_activity.data["id"]
     end
   end
 
   describe "deletion" do
     test "it creates a delete activity and deletes the original object" do
       note = insert(:note_activity)
-      object = Object.get_by_ap_id(note.data["object"]["id"])
+      object = Object.normalize(note)
       {:ok, delete} = ActivityPub.delete(object)
 
       assert delete.data["type"] == "Delete"
       assert delete.data["actor"] == note.data["actor"]
-      assert delete.data["object"] == note.data["object"]["id"]
+      assert delete.data["object"] == object.data["id"]
 
       assert Activity.get_by_id(delete.id) != nil
 
@@ -897,13 +963,14 @@ defmodule Pleroma.Web.ActivityPub.ActivityPubTest do
     test "it creates a delete activity and checks that it is also sent to users mentioned by the deleted object" do
       user = insert(:user)
       note = insert(:note_activity)
+      object = Object.normalize(note)
 
       {:ok, object} =
-        Object.get_by_ap_id(note.data["object"]["id"])
+        object
         |> Object.change(%{
           data: %{
-            "actor" => note.data["object"]["actor"],
-            "id" => note.data["object"]["id"],
+            "actor" => object.data["actor"],
+            "id" => object.data["id"],
             "to" => [user.ap_id],
             "type" => "Note"
           }
@@ -1015,8 +1082,9 @@ defmodule Pleroma.Web.ActivityPub.ActivityPubTest do
 
       assert update.data["actor"] == user.ap_id
       assert update.data["to"] == [user.follower_address]
-      assert update.data["object"]["id"] == user_data["id"]
-      assert update.data["object"]["type"] == user_data["type"]
+      assert embedded_object = update.data["object"]
+      assert embedded_object["id"] == user_data["id"]
+      assert embedded_object["type"] == user_data["type"]
     end
   end
 
@@ -1073,111 +1141,19 @@ defmodule Pleroma.Web.ActivityPub.ActivityPubTest do
            } = activity
   end
 
-  describe "publish_one/1" do
-    test_with_mock "calls `Instances.set_reachable` on successful federation if `unreachable_since` is not specified",
-                   Instances,
-                   [:passthrough],
-                   [] do
-      actor = insert(:user)
-      inbox = "http://200.site/users/nick1/inbox"
+  test "fetch_activities/2 returns activities addressed to a list " do
+    user = insert(:user)
+    member = insert(:user)
+    {:ok, list} = Pleroma.List.create("foo", user)
+    {:ok, list} = Pleroma.List.follow(list, member)
 
-      assert {:ok, _} = Publisher.publish_one(%{inbox: inbox, json: "{}", actor: actor, id: 1})
+    {:ok, activity} =
+      CommonAPI.post(user, %{"status" => "foobar", "visibility" => "list:#{list.id}"})
 
-      assert called(Instances.set_reachable(inbox))
-    end
+    activity = Repo.preload(activity, :bookmark)
+    activity = %Activity{activity | thread_muted?: !!activity.thread_muted?}
 
-    test_with_mock "calls `Instances.set_reachable` on successful federation if `unreachable_since` is set",
-                   Instances,
-                   [:passthrough],
-                   [] do
-      actor = insert(:user)
-      inbox = "http://200.site/users/nick1/inbox"
-
-      assert {:ok, _} =
-               Publisher.publish_one(%{
-                 inbox: inbox,
-                 json: "{}",
-                 actor: actor,
-                 id: 1,
-                 unreachable_since: NaiveDateTime.utc_now()
-               })
-
-      assert called(Instances.set_reachable(inbox))
-    end
-
-    test_with_mock "does NOT call `Instances.set_reachable` on successful federation if `unreachable_since` is nil",
-                   Instances,
-                   [:passthrough],
-                   [] do
-      actor = insert(:user)
-      inbox = "http://200.site/users/nick1/inbox"
-
-      assert {:ok, _} =
-               Publisher.publish_one(%{
-                 inbox: inbox,
-                 json: "{}",
-                 actor: actor,
-                 id: 1,
-                 unreachable_since: nil
-               })
-
-      refute called(Instances.set_reachable(inbox))
-    end
-
-    test_with_mock "calls `Instances.set_unreachable` on target inbox on non-2xx HTTP response code",
-                   Instances,
-                   [:passthrough],
-                   [] do
-      actor = insert(:user)
-      inbox = "http://404.site/users/nick1/inbox"
-
-      assert {:error, _} = Publisher.publish_one(%{inbox: inbox, json: "{}", actor: actor, id: 1})
-
-      assert called(Instances.set_unreachable(inbox))
-    end
-
-    test_with_mock "it calls `Instances.set_unreachable` on target inbox on request error of any kind",
-                   Instances,
-                   [:passthrough],
-                   [] do
-      actor = insert(:user)
-      inbox = "http://connrefused.site/users/nick1/inbox"
-
-      assert {:error, _} = Publisher.publish_one(%{inbox: inbox, json: "{}", actor: actor, id: 1})
-
-      assert called(Instances.set_unreachable(inbox))
-    end
-
-    test_with_mock "does NOT call `Instances.set_unreachable` if target is reachable",
-                   Instances,
-                   [:passthrough],
-                   [] do
-      actor = insert(:user)
-      inbox = "http://200.site/users/nick1/inbox"
-
-      assert {:ok, _} = Publisher.publish_one(%{inbox: inbox, json: "{}", actor: actor, id: 1})
-
-      refute called(Instances.set_unreachable(inbox))
-    end
-
-    test_with_mock "does NOT call `Instances.set_unreachable` if target instance has non-nil `unreachable_since`",
-                   Instances,
-                   [:passthrough],
-                   [] do
-      actor = insert(:user)
-      inbox = "http://connrefused.site/users/nick1/inbox"
-
-      assert {:error, _} =
-               Publisher.publish_one(%{
-                 inbox: inbox,
-                 json: "{}",
-                 actor: actor,
-                 id: 1,
-                 unreachable_since: NaiveDateTime.utc_now()
-               })
-
-      refute called(Instances.set_unreachable(inbox))
-    end
+    assert ActivityPub.fetch_activities([], %{"user" => user}) == [activity]
   end
 
   def data_uri do
@@ -1210,6 +1186,67 @@ defmodule Pleroma.Web.ActivityPub.ActivityPubTest do
 
       [result] = ActivityPub.fetch_activities_bounded([], [user.follower_address])
       assert result.id == activity.id
+    end
+  end
+
+  describe "fetch_follow_information_for_user" do
+    test "syncronizes following/followers counters" do
+      user =
+        insert(:user,
+          local: false,
+          follower_address: "http://localhost:4001/users/fuser2/followers",
+          following_address: "http://localhost:4001/users/fuser2/following"
+        )
+
+      {:ok, info} = ActivityPub.fetch_follow_information_for_user(user)
+      assert info.follower_count == 527
+      assert info.following_count == 267
+    end
+
+    test "detects hidden followers" do
+      mock(fn env ->
+        case env.url do
+          "http://localhost:4001/users/masto_closed/followers?page=1" ->
+            %Tesla.Env{status: 403, body: ""}
+
+          _ ->
+            apply(HttpRequestMock, :request, [env])
+        end
+      end)
+
+      user =
+        insert(:user,
+          local: false,
+          follower_address: "http://localhost:4001/users/masto_closed/followers",
+          following_address: "http://localhost:4001/users/masto_closed/following"
+        )
+
+      {:ok, info} = ActivityPub.fetch_follow_information_for_user(user)
+      assert info.hide_followers == true
+      assert info.hide_follows == false
+    end
+
+    test "detects hidden follows" do
+      mock(fn env ->
+        case env.url do
+          "http://localhost:4001/users/masto_closed/following?page=1" ->
+            %Tesla.Env{status: 403, body: ""}
+
+          _ ->
+            apply(HttpRequestMock, :request, [env])
+        end
+      end)
+
+      user =
+        insert(:user,
+          local: false,
+          follower_address: "http://localhost:4001/users/masto_closed/followers",
+          following_address: "http://localhost:4001/users/masto_closed/following"
+        )
+
+      {:ok, info} = ActivityPub.fetch_follow_information_for_user(user)
+      assert info.hide_followers == false
+      assert info.hide_follows == true
     end
   end
 end

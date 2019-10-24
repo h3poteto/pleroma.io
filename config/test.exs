@@ -23,12 +23,16 @@ config :pleroma, Pleroma.Upload, filters: [], link_name: false
 
 config :pleroma, Pleroma.Uploaders.Local, uploads: "test/uploads"
 
-config :pleroma, Pleroma.Emails.Mailer, adapter: Swoosh.Adapters.Test
+config :pleroma, Pleroma.Emails.Mailer, adapter: Swoosh.Adapters.Test, enabled: true
 
 config :pleroma, :instance,
   email: "admin@example.com",
   notify_email: "noreply@example.com",
-  skip_thread_containment: false
+  skip_thread_containment: false,
+  federating: false,
+  external_user_synchronization: false
+
+config :pleroma, :activitypub, sign_object_fetches: false
 
 # Configure your database
 config :pleroma, Pleroma.Repo,
@@ -64,7 +68,11 @@ config :pleroma, Pleroma.ScheduledActivity,
   total_user_limit: 3,
   enabled: false
 
-config :pleroma, :rate_limit, app_account_creation: {10_000, 5}
+config :pleroma, :rate_limit,
+  search: [{1000, 30}, {1000, 30}],
+  app_account_creation: {10_000, 5},
+  password_reset: {1000, 30},
+  ap_routes: nil
 
 config :pleroma, :http_security, report_uri: "https://endpoint.com"
 
@@ -74,11 +82,14 @@ rum_enabled = System.get_env("RUM_ENABLED") == "true"
 config :pleroma, :database, rum_enabled: rum_enabled
 IO.puts("RUM enabled: #{rum_enabled}")
 
-try do
+config :joken, default_signer: "yU8uHKq+yyAkZ11Hx//jcdacWc8yQ1bxAAGrplzB0Zwwjkp35v0RK9SO8WTPr6QZ"
+
+config :pleroma, Pleroma.ReverseProxy.Client, Pleroma.ReverseProxy.ClientMock
+
+if File.exists?("./config/test.secret.exs") do
   import_config "test.secret.exs"
-rescue
-  _ ->
-    IO.puts(
-      "You may want to create test.secret.exs to declare custom database connection parameters."
-    )
+else
+  IO.puts(
+    "You may want to create test.secret.exs to declare custom database connection parameters."
+  )
 end

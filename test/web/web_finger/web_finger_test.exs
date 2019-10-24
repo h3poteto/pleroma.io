@@ -40,6 +40,11 @@ defmodule Pleroma.Web.WebFingerTest do
   end
 
   describe "fingering" do
+    test "returns error when fails parse xml or json" do
+      user = "invalid_content@social.heldscal.la"
+      assert {:error, %Jason.DecodeError{}} = WebFinger.finger(user)
+    end
+
     test "returns the info for an OStatus user" do
       user = "shp@social.heldscal.la"
 
@@ -81,6 +86,20 @@ defmodule Pleroma.Web.WebFingerTest do
       assert data["subscribe_address"] == "https://gnusocial.de/main/ostatussub?profile={uri}"
     end
 
+    test "it work for AP-only user" do
+      user = "kpherox@mstdn.jp"
+
+      {:ok, data} = WebFinger.finger(user)
+
+      assert data["magic_key"] == nil
+      assert data["salmon"] == nil
+
+      assert data["topic"] == "https://mstdn.jp/users/kPherox.atom"
+      assert data["subject"] == "acct:kPherox@mstdn.jp"
+      assert data["ap_id"] == "https://mstdn.jp/users/kPherox"
+      assert data["subscribe_address"] == "https://mstdn.jp/authorize_interaction?acct={uri}"
+    end
+
     test "it works for friendica" do
       user = "lain@squeet.me"
 
@@ -103,6 +122,17 @@ defmodule Pleroma.Web.WebFingerTest do
       {:ok, template} = WebFinger.find_lrdd_template("status.alpicola.com")
 
       assert template == "http://status.alpicola.com/main/xrd?uri={uri}"
+    end
+
+    test "it works with idna domains as nickname" do
+      nickname = "lain@" <> to_string(:idna.encode("zetsubou.みんな"))
+
+      {:ok, _data} = WebFinger.finger(nickname)
+    end
+
+    test "it works with idna domains as link" do
+      ap_id = "https://" <> to_string(:idna.encode("zetsubou.みんな")) <> "/users/lain"
+      {:ok, _data} = WebFinger.finger(ap_id)
     end
   end
 end

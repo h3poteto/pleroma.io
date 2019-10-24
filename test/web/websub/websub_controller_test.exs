@@ -9,6 +9,10 @@ defmodule Pleroma.Web.Websub.WebsubControllerTest do
   alias Pleroma.Web.Websub
   alias Pleroma.Web.Websub.WebsubClientSubscription
 
+  clear_config_all([:instance, :federating]) do
+    Pleroma.Config.put([:instance, :federating], true)
+  end
+
   test "websub subscription request", %{conn: conn} do
     user = insert(:user)
 

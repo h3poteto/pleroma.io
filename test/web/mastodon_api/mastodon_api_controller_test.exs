@@ -7,6 +7,8 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
 
   alias Ecto.Changeset
   alias Pleroma.Activity
+  alias Pleroma.ActivityExpiration
+  alias Pleroma.Config
   alias Pleroma.Notification
   alias Pleroma.Object
   alias Pleroma.Repo
@@ -19,21 +21,26 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
   alias Pleroma.Web.OAuth.Token
   alias Pleroma.Web.OStatus
   alias Pleroma.Web.Push
-  alias Pleroma.Web.TwitterAPI.TwitterAPI
   import Pleroma.Factory
   import ExUnit.CaptureLog
   import Tesla.Mock
+  import Swoosh.TestAssertions
+
+  @image "data:image/gif;base64,R0lGODlhEAAQAMQAAORHHOVSKudfOulrSOp3WOyDZu6QdvCchPGolfO0o/XBs/fNwfjZ0frl3/zy7////wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACH5BAkAABAALAAAAAAQABAAAAVVICSOZGlCQAosJ6mu7fiyZeKqNKToQGDsM8hBADgUXoGAiqhSvp5QAnQKGIgUhwFUYLCVDFCrKUE1lBavAViFIDlTImbKC5Gm2hB0SlBCBMQiB0UjIQA7"
 
   setup do
     mock(fn env -> apply(HttpRequestMock, :request, [env]) end)
     :ok
   end
 
+  clear_config([:instance, :public])
+  clear_config([:rich_media, :enabled])
+
   test "the home timeline", %{conn: conn} do
     user = insert(:user)
     following = insert(:user)
 
-    {:ok, _activity} = TwitterAPI.create_status(following, %{"status" => "test"})
+    {:ok, _activity} = CommonAPI.post(following, %{"status" => "test"})
 
     conn =
       conn
@@ -56,7 +63,7 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
     following = insert(:user)
 
     capture_log(fn ->
-      {:ok, _activity} = TwitterAPI.create_status(following, %{"status" => "test"})
+      {:ok, _activity} = CommonAPI.post(following, %{"status" => "test"})
 
       {:ok, [_activity]} =
         OStatus.fetch_activity_from_url("https://shitposter.club/notice/2827873")
@@ -82,16 +89,27 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
   end
 
   test "the public timeline when public is set to false", %{conn: conn} do
-    public = Pleroma.Config.get([:instance, :public])
-    Pleroma.Config.put([:instance, :public], false)
-
-    on_exit(fn ->
-      Pleroma.Config.put([:instance, :public], public)
-    end)
+    Config.put([:instance, :public], false)
 
     assert conn
            |> get("/api/v1/timelines/public", %{"local" => "False"})
            |> json_response(403) == %{"error" => "This resource requires authentication."}
+  end
+
+  test "the public timeline includes only public statuses for an authenticated user" do
+    user = insert(:user)
+
+    conn =
+      build_conn()
+      |> assign(:user, user)
+
+    {:ok, _activity} = CommonAPI.post(user, %{"status" => "test"})
+    {:ok, _activity} = CommonAPI.post(user, %{"status" => "test", "visibility" => "private"})
+    {:ok, _activity} = CommonAPI.post(user, %{"status" => "test", "visibility" => "unlisted"})
+    {:ok, _activity} = CommonAPI.post(user, %{"status" => "test", "visibility" => "direct"})
+
+    res_conn = get(conn, "/api/v1/timelines/public")
+    assert length(json_response(res_conn, 200)) == 1
   end
 
   describe "posting statuses" do
@@ -148,6 +166,32 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
 
       assert %{"id" => third_id} = json_response(conn_three, 200)
       refute id == third_id
+
+      # An activity that will expire:
+      # 2 hours
+      expires_in = 120 * 60
+
+      conn_four =
+        conn
+        |> post("api/v1/statuses", %{
+          "status" => "oolong",
+          "expires_in" => expires_in
+        })
+
+      assert fourth_response = %{"id" => fourth_id} = json_response(conn_four, 200)
+      assert activity = Activity.get_by_id(fourth_id)
+      assert expiration = ActivityExpiration.get_by_activity_id(fourth_id)
+
+      estimated_expires_at =
+        NaiveDateTime.utc_now()
+        |> NaiveDateTime.add(expires_in)
+        |> NaiveDateTime.truncate(:second)
+
+      # This assert will fail if the test takes longer than a minute. I sure hope it never does:
+      assert abs(NaiveDateTime.diff(expiration.scheduled_at, estimated_expires_at, :second)) < 60
+
+      assert fourth_response["pleroma"]["expires_at"] ==
+               NaiveDateTime.to_iso8601(expiration.scheduled_at)
     end
 
     test "replying to a status", %{conn: conn} do
@@ -247,7 +291,7 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
     end
 
     test "posting a status with OGP link preview", %{conn: conn} do
-      Pleroma.Config.put([:rich_media, :enabled], true)
+      Config.put([:rich_media, :enabled], true)
 
       conn =
         conn
@@ -257,7 +301,6 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
 
       assert %{"id" => id, "card" => %{"title" => "The Rock"}} = json_response(conn, 200)
       assert Activity.get_by_id(id)
-      Pleroma.Config.put([:rich_media, :enabled], false)
     end
 
     test "posting a direct status", %{conn: conn} do
@@ -301,7 +344,7 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
 
     test "option limit is enforced", %{conn: conn} do
       user = insert(:user)
-      limit = Pleroma.Config.get([:instance, :poll_limits, :max_options])
+      limit = Config.get([:instance, :poll_limits, :max_options])
 
       conn =
         conn
@@ -317,7 +360,7 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
 
     test "option character limit is enforced", %{conn: conn} do
       user = insert(:user)
-      limit = Pleroma.Config.get([:instance, :poll_limits, :max_option_chars])
+      limit = Config.get([:instance, :poll_limits, :max_option_chars])
 
       conn =
         conn
@@ -336,7 +379,7 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
 
     test "minimal date limit is enforced", %{conn: conn} do
       user = insert(:user)
-      limit = Pleroma.Config.get([:instance, :poll_limits, :min_expiration])
+      limit = Config.get([:instance, :poll_limits, :min_expiration])
 
       conn =
         conn
@@ -355,7 +398,7 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
 
     test "maximum date limit is enforced", %{conn: conn} do
       user = insert(:user)
-      limit = Pleroma.Config.get([:instance, :poll_limits, :max_expiration])
+      limit = Config.get([:instance, :poll_limits, :max_expiration])
 
       conn =
         conn
@@ -402,7 +445,7 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
     assert %{"visibility" => "direct"} = status
     assert status["url"] != direct.data["id"]
 
-    # User should be able to see his own direct message
+    # User should be able to see their own direct message
     res_conn =
       build_conn()
       |> assign(:user, user_one)
@@ -584,6 +627,101 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
     assert expected == json_response(conn, 200)
   end
 
+  test "user avatar can be set", %{conn: conn} do
+    user = insert(:user)
+    avatar_image = File.read!("test/fixtures/avatar_data_uri")
+
+    conn =
+      conn
+      |> assign(:user, user)
+      |> patch("/api/v1/pleroma/accounts/update_avatar", %{img: avatar_image})
+
+    user = refresh_record(user)
+
+    assert %{
+             "name" => _,
+             "type" => _,
+             "url" => [
+               %{
+                 "href" => _,
+                 "mediaType" => _,
+                 "type" => _
+               }
+             ]
+           } = user.avatar
+
+    assert %{"url" => _} = json_response(conn, 200)
+  end
+
+  test "user avatar can be reset", %{conn: conn} do
+    user = insert(:user)
+
+    conn =
+      conn
+      |> assign(:user, user)
+      |> patch("/api/v1/pleroma/accounts/update_avatar", %{img: ""})
+
+    user = User.get_cached_by_id(user.id)
+
+    assert user.avatar == nil
+
+    assert %{"url" => nil} = json_response(conn, 200)
+  end
+
+  test "can set profile banner", %{conn: conn} do
+    user = insert(:user)
+
+    conn =
+      conn
+      |> assign(:user, user)
+      |> patch("/api/v1/pleroma/accounts/update_banner", %{"banner" => @image})
+
+    user = refresh_record(user)
+    assert user.info.banner["type"] == "Image"
+
+    assert %{"url" => _} = json_response(conn, 200)
+  end
+
+  test "can reset profile banner", %{conn: conn} do
+    user = insert(:user)
+
+    conn =
+      conn
+      |> assign(:user, user)
+      |> patch("/api/v1/pleroma/accounts/update_banner", %{"banner" => ""})
+
+    user = refresh_record(user)
+    assert user.info.banner == %{}
+
+    assert %{"url" => nil} = json_response(conn, 200)
+  end
+
+  test "background image can be set", %{conn: conn} do
+    user = insert(:user)
+
+    conn =
+      conn
+      |> assign(:user, user)
+      |> patch("/api/v1/pleroma/accounts/update_background", %{"img" => @image})
+
+    user = refresh_record(user)
+    assert user.info.background["type"] == "Image"
+    assert %{"url" => _} = json_response(conn, 200)
+  end
+
+  test "background image can be reset", %{conn: conn} do
+    user = insert(:user)
+
+    conn =
+      conn
+      |> assign(:user, user)
+      |> patch("/api/v1/pleroma/accounts/update_background", %{"img" => ""})
+
+    user = refresh_record(user)
+    assert user.info.background == %{}
+    assert %{"url" => nil} = json_response(conn, 200)
+  end
+
   test "creates an oauth app", %{conn: conn} do
     user = insert(:user)
     app_attrs = build(:oauth_app)
@@ -620,6 +758,16 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
 
     assert %{"id" => id} = json_response(conn, 200)
     assert id == to_string(activity.id)
+  end
+
+  test "get statuses by IDs", %{conn: conn} do
+    %{id: id1} = insert(:note_activity)
+    %{id: id2} = insert(:note_activity)
+
+    query_string = "ids[]=#{id1}&ids[]=#{id2}"
+    conn = get(conn, "/api/v1/statuses/?#{query_string}")
+
+    assert [%{"id" => ^id1}, %{"id" => ^id2}] = json_response(conn, :ok)
   end
 
   describe "deleting a status" do
@@ -804,111 +952,12 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
     end
   end
 
-  describe "lists" do
-    test "creating a list", %{conn: conn} do
-      user = insert(:user)
-
-      conn =
-        conn
-        |> assign(:user, user)
-        |> post("/api/v1/lists", %{"title" => "cuties"})
-
-      assert %{"title" => title} = json_response(conn, 200)
-      assert title == "cuties"
-    end
-
-    test "adding users to a list", %{conn: conn} do
-      user = insert(:user)
-      other_user = insert(:user)
-      {:ok, list} = Pleroma.List.create("name", user)
-
-      conn =
-        conn
-        |> assign(:user, user)
-        |> post("/api/v1/lists/#{list.id}/accounts", %{"account_ids" => [other_user.id]})
-
-      assert %{} == json_response(conn, 200)
-      %Pleroma.List{following: following} = Pleroma.List.get(list.id, user)
-      assert following == [other_user.follower_address]
-    end
-
-    test "removing users from a list", %{conn: conn} do
-      user = insert(:user)
-      other_user = insert(:user)
-      third_user = insert(:user)
-      {:ok, list} = Pleroma.List.create("name", user)
-      {:ok, list} = Pleroma.List.follow(list, other_user)
-      {:ok, list} = Pleroma.List.follow(list, third_user)
-
-      conn =
-        conn
-        |> assign(:user, user)
-        |> delete("/api/v1/lists/#{list.id}/accounts", %{"account_ids" => [other_user.id]})
-
-      assert %{} == json_response(conn, 200)
-      %Pleroma.List{following: following} = Pleroma.List.get(list.id, user)
-      assert following == [third_user.follower_address]
-    end
-
-    test "listing users in a list", %{conn: conn} do
-      user = insert(:user)
-      other_user = insert(:user)
-      {:ok, list} = Pleroma.List.create("name", user)
-      {:ok, list} = Pleroma.List.follow(list, other_user)
-
-      conn =
-        conn
-        |> assign(:user, user)
-        |> get("/api/v1/lists/#{list.id}/accounts", %{"account_ids" => [other_user.id]})
-
-      assert [%{"id" => id}] = json_response(conn, 200)
-      assert id == to_string(other_user.id)
-    end
-
-    test "retrieving a list", %{conn: conn} do
-      user = insert(:user)
-      {:ok, list} = Pleroma.List.create("name", user)
-
-      conn =
-        conn
-        |> assign(:user, user)
-        |> get("/api/v1/lists/#{list.id}")
-
-      assert %{"id" => id} = json_response(conn, 200)
-      assert id == to_string(list.id)
-    end
-
-    test "renaming a list", %{conn: conn} do
-      user = insert(:user)
-      {:ok, list} = Pleroma.List.create("name", user)
-
-      conn =
-        conn
-        |> assign(:user, user)
-        |> put("/api/v1/lists/#{list.id}", %{"title" => "newname"})
-
-      assert %{"title" => name} = json_response(conn, 200)
-      assert name == "newname"
-    end
-
-    test "deleting a list", %{conn: conn} do
-      user = insert(:user)
-      {:ok, list} = Pleroma.List.create("name", user)
-
-      conn =
-        conn
-        |> assign(:user, user)
-        |> delete("/api/v1/lists/#{list.id}")
-
-      assert %{} = json_response(conn, 200)
-      assert is_nil(Repo.get(Pleroma.List, list.id))
-    end
-
+  describe "list timelines" do
     test "list timeline", %{conn: conn} do
       user = insert(:user)
       other_user = insert(:user)
-      {:ok, _activity_one} = TwitterAPI.create_status(user, %{"status" => "Marisa is cute."})
-      {:ok, activity_two} = TwitterAPI.create_status(other_user, %{"status" => "Marisa is cute."})
+      {:ok, _activity_one} = CommonAPI.post(user, %{"status" => "Marisa is cute."})
+      {:ok, activity_two} = CommonAPI.post(other_user, %{"status" => "Marisa is cute."})
       {:ok, list} = Pleroma.List.create("name", user)
       {:ok, list} = Pleroma.List.follow(list, other_user)
 
@@ -925,10 +974,10 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
     test "list timeline does not leak non-public statuses for unfollowed users", %{conn: conn} do
       user = insert(:user)
       other_user = insert(:user)
-      {:ok, activity_one} = TwitterAPI.create_status(other_user, %{"status" => "Marisa is cute."})
+      {:ok, activity_one} = CommonAPI.post(other_user, %{"status" => "Marisa is cute."})
 
       {:ok, _activity_two} =
-        TwitterAPI.create_status(other_user, %{
+        CommonAPI.post(other_user, %{
           "status" => "Marisa is cute.",
           "visibility" => "private"
         })
@@ -952,8 +1001,7 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
       user = insert(:user)
       other_user = insert(:user)
 
-      {:ok, activity} =
-        TwitterAPI.create_status(other_user, %{"status" => "hi @#{user.nickname}"})
+      {:ok, activity} = CommonAPI.post(other_user, %{"status" => "hi @#{user.nickname}"})
 
       {:ok, [_notification]} = Notification.create_notifications(activity)
 
@@ -975,8 +1023,7 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
       user = insert(:user)
       other_user = insert(:user)
 
-      {:ok, activity} =
-        TwitterAPI.create_status(other_user, %{"status" => "hi @#{user.nickname}"})
+      {:ok, activity} = CommonAPI.post(other_user, %{"status" => "hi @#{user.nickname}"})
 
       {:ok, [notification]} = Notification.create_notifications(activity)
 
@@ -998,8 +1045,7 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
       user = insert(:user)
       other_user = insert(:user)
 
-      {:ok, activity} =
-        TwitterAPI.create_status(other_user, %{"status" => "hi @#{user.nickname}"})
+      {:ok, activity} = CommonAPI.post(other_user, %{"status" => "hi @#{user.nickname}"})
 
       {:ok, [notification]} = Notification.create_notifications(activity)
 
@@ -1015,8 +1061,7 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
       user = insert(:user)
       other_user = insert(:user)
 
-      {:ok, activity} =
-        TwitterAPI.create_status(other_user, %{"status" => "hi @#{user.nickname}"})
+      {:ok, activity} = CommonAPI.post(other_user, %{"status" => "hi @#{user.nickname}"})
 
       {:ok, [_notification]} = Notification.create_notifications(activity)
 
@@ -1177,6 +1222,71 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
       result = json_response(conn_res, 200)
       assert [%{"id" => ^notification4_id}, %{"id" => ^notification3_id}] = result
     end
+
+    test "doesn't see notifications after muting user with notifications", %{conn: conn} do
+      user = insert(:user)
+      user2 = insert(:user)
+
+      {:ok, _, _, _} = CommonAPI.follow(user, user2)
+      {:ok, _} = CommonAPI.post(user2, %{"status" => "hey @#{user.nickname}"})
+
+      conn = assign(conn, :user, user)
+
+      conn = get(conn, "/api/v1/notifications")
+
+      assert length(json_response(conn, 200)) == 1
+
+      {:ok, user} = User.mute(user, user2)
+
+      conn = assign(build_conn(), :user, user)
+      conn = get(conn, "/api/v1/notifications")
+
+      assert json_response(conn, 200) == []
+    end
+
+    test "see notifications after muting user without notifications", %{conn: conn} do
+      user = insert(:user)
+      user2 = insert(:user)
+
+      {:ok, _, _, _} = CommonAPI.follow(user, user2)
+      {:ok, _} = CommonAPI.post(user2, %{"status" => "hey @#{user.nickname}"})
+
+      conn = assign(conn, :user, user)
+
+      conn = get(conn, "/api/v1/notifications")
+
+      assert length(json_response(conn, 200)) == 1
+
+      {:ok, user} = User.mute(user, user2, false)
+
+      conn = assign(build_conn(), :user, user)
+      conn = get(conn, "/api/v1/notifications")
+
+      assert length(json_response(conn, 200)) == 1
+    end
+
+    test "see notifications after muting user with notifications and with_muted parameter", %{
+      conn: conn
+    } do
+      user = insert(:user)
+      user2 = insert(:user)
+
+      {:ok, _, _, _} = CommonAPI.follow(user, user2)
+      {:ok, _} = CommonAPI.post(user2, %{"status" => "hey @#{user.nickname}"})
+
+      conn = assign(conn, :user, user)
+
+      conn = get(conn, "/api/v1/notifications")
+
+      assert length(json_response(conn, 200)) == 1
+
+      {:ok, user} = User.mute(user, user2)
+
+      conn = assign(build_conn(), :user, user)
+      conn = get(conn, "/api/v1/notifications", %{"with_muted" => "true"})
+
+      assert length(json_response(conn, 200)) == 1
+    end
   end
 
   describe "reblogging" do
@@ -1233,6 +1343,17 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
 
       assert to_string(activity.id) == id
     end
+
+    test "returns 400 error when activity is not exist", %{conn: conn} do
+      user = insert(:user)
+
+      conn =
+        conn
+        |> assign(:user, user)
+        |> post("/api/v1/statuses/foo/reblog")
+
+      assert json_response(conn, 400) == %{"error" => "Could not repeat"}
+    end
   end
 
   describe "unreblogging" do
@@ -1250,6 +1371,17 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
       assert %{"id" => id, "reblogged" => false, "reblogs_count" => 0} = json_response(conn, 200)
 
       assert to_string(activity.id) == id
+    end
+
+    test "returns 400 error when activity is not exist", %{conn: conn} do
+      user = insert(:user)
+
+      conn =
+        conn
+        |> assign(:user, user)
+        |> post("/api/v1/statuses/foo/unreblog")
+
+      assert json_response(conn, 400) == %{"error" => "Could not unrepeat"}
     end
   end
 
@@ -1269,16 +1401,15 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
       assert to_string(activity.id) == id
     end
 
-    test "returns 500 for a wrong id", %{conn: conn} do
+    test "returns 400 error for a wrong id", %{conn: conn} do
       user = insert(:user)
 
-      resp =
+      conn =
         conn
         |> assign(:user, user)
         |> post("/api/v1/statuses/1/favourite")
-        |> json_response(500)
 
-      assert resp == "Something went wrong"
+      assert json_response(conn, 400) == %{"error" => "Could not favorite"}
     end
   end
 
@@ -1298,6 +1429,17 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
                json_response(conn, 200)
 
       assert to_string(activity.id) == id
+    end
+
+    test "returns 400 error for a wrong id", %{conn: conn} do
+      user = insert(:user)
+
+      conn =
+        conn
+        |> assign(:user, user)
+        |> post("/api/v1/statuses/1/unfavourite")
+
+      assert json_response(conn, 400) == %{"error" => "Could not unfavorite"}
     end
   end
 
@@ -1367,12 +1509,9 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
         filename: "an_image.jpg"
       }
 
-      media =
-        TwitterAPI.upload(file, user, "json")
-        |> Poison.decode!()
+      {:ok, %{id: media_id}} = ActivityPub.upload(file, actor: user.ap_id)
 
-      {:ok, image_post} =
-        TwitterAPI.create_status(user, %{"status" => "cofe", "media_ids" => [media["media_id"]]})
+      {:ok, image_post} = CommonAPI.post(user, %{"status" => "cofe", "media_ids" => [media_id]})
 
       conn =
         conn
@@ -1408,6 +1547,19 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
       assert [%{"id" => id}] = json_response(conn, 200)
       assert id == to_string(post.id)
     end
+
+    test "filters user's statuses by a hashtag", %{conn: conn} do
+      user = insert(:user)
+      {:ok, post} = CommonAPI.post(user, %{"status" => "#hashtag"})
+      {:ok, _post} = CommonAPI.post(user, %{"status" => "hashtag"})
+
+      conn =
+        conn
+        |> get("/api/v1/accounts/#{user.id}/statuses", %{"tagged" => "hashtag"})
+
+      assert [%{"id" => id}] = json_response(conn, 200)
+      assert id == to_string(post.id)
+    end
   end
 
   describe "user relationships" do
@@ -1429,14 +1581,6 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
 
   describe "media upload" do
     setup do
-      upload_config = Pleroma.Config.get([Pleroma.Upload])
-      proxy_config = Pleroma.Config.get([:media_proxy])
-
-      on_exit(fn ->
-        Pleroma.Config.put([Pleroma.Upload], upload_config)
-        Pleroma.Config.put([:media_proxy], proxy_config)
-      end)
-
       user = insert(:user)
 
       conn =
@@ -1452,6 +1596,9 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
       [conn: conn, image: image]
     end
 
+    clear_config([:media_proxy])
+    clear_config([Pleroma.Upload])
+
     test "returns uploaded image", %{conn: conn, image: image} do
       desc = "Description of the image"
 
@@ -1466,40 +1613,6 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
 
       object = Repo.get(Object, media["id"])
       assert object.data["actor"] == User.ap_id(conn.assigns[:user])
-    end
-
-    test "returns proxied url when media proxy is enabled", %{conn: conn, image: image} do
-      Pleroma.Config.put([Pleroma.Upload, :base_url], "https://media.pleroma.social")
-
-      proxy_url = "https://cache.pleroma.social"
-      Pleroma.Config.put([:media_proxy, :enabled], true)
-      Pleroma.Config.put([:media_proxy, :base_url], proxy_url)
-
-      media =
-        conn
-        |> post("/api/v1/media", %{"file" => image})
-        |> json_response(:ok)
-
-      assert String.starts_with?(media["url"], proxy_url)
-    end
-
-    test "returns media url when proxy is enabled but media url is whitelisted", %{
-      conn: conn,
-      image: image
-    } do
-      media_url = "https://media.pleroma.social"
-      Pleroma.Config.put([Pleroma.Upload, :base_url], media_url)
-
-      Pleroma.Config.put([:media_proxy, :enabled], true)
-      Pleroma.Config.put([:media_proxy, :base_url], "https://cache.pleroma.social")
-      Pleroma.Config.put([:media_proxy, :whitelist], ["media.pleroma.social"])
-
-      media =
-        conn
-        |> post("/api/v1/media", %{"file" => image})
-        |> json_response(:ok)
-
-      assert String.starts_with?(media["url"], media_url)
     end
   end
 
@@ -1584,32 +1697,85 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
     end
   end
 
-  test "account fetching", %{conn: conn} do
-    user = insert(:user)
+  describe "account fetching" do
+    test "works by id" do
+      user = insert(:user)
 
-    conn =
-      conn
-      |> get("/api/v1/accounts/#{user.id}")
+      conn =
+        build_conn()
+        |> get("/api/v1/accounts/#{user.id}")
 
-    assert %{"id" => id} = json_response(conn, 200)
-    assert id == to_string(user.id)
+      assert %{"id" => id} = json_response(conn, 200)
+      assert id == to_string(user.id)
 
-    conn =
-      build_conn()
-      |> get("/api/v1/accounts/-1")
+      conn =
+        build_conn()
+        |> get("/api/v1/accounts/-1")
 
-    assert %{"error" => "Can't find user"} = json_response(conn, 404)
-  end
+      assert %{"error" => "Can't find user"} = json_response(conn, 404)
+    end
 
-  test "account fetching also works nickname", %{conn: conn} do
-    user = insert(:user)
+    test "works by nickname" do
+      user = insert(:user)
 
-    conn =
-      conn
-      |> get("/api/v1/accounts/#{user.nickname}")
+      conn =
+        build_conn()
+        |> get("/api/v1/accounts/#{user.nickname}")
 
-    assert %{"id" => id} = json_response(conn, 200)
-    assert id == user.id
+      assert %{"id" => id} = json_response(conn, 200)
+      assert id == user.id
+    end
+
+    test "works by nickname for remote users" do
+      limit_to_local = Pleroma.Config.get([:instance, :limit_to_local_content])
+      Pleroma.Config.put([:instance, :limit_to_local_content], false)
+      user = insert(:user, nickname: "user@example.com", local: false)
+
+      conn =
+        build_conn()
+        |> get("/api/v1/accounts/#{user.nickname}")
+
+      Pleroma.Config.put([:instance, :limit_to_local_content], limit_to_local)
+      assert %{"id" => id} = json_response(conn, 200)
+      assert id == user.id
+    end
+
+    test "respects limit_to_local_content == :all for remote user nicknames" do
+      limit_to_local = Pleroma.Config.get([:instance, :limit_to_local_content])
+      Pleroma.Config.put([:instance, :limit_to_local_content], :all)
+
+      user = insert(:user, nickname: "user@example.com", local: false)
+
+      conn =
+        build_conn()
+        |> get("/api/v1/accounts/#{user.nickname}")
+
+      Pleroma.Config.put([:instance, :limit_to_local_content], limit_to_local)
+      assert json_response(conn, 404)
+    end
+
+    test "respects limit_to_local_content == :unauthenticated for remote user nicknames" do
+      limit_to_local = Pleroma.Config.get([:instance, :limit_to_local_content])
+      Pleroma.Config.put([:instance, :limit_to_local_content], :unauthenticated)
+
+      user = insert(:user, nickname: "user@example.com", local: false)
+      reading_user = insert(:user)
+
+      conn =
+        build_conn()
+        |> get("/api/v1/accounts/#{user.nickname}")
+
+      assert json_response(conn, 404)
+
+      conn =
+        build_conn()
+        |> assign(:user, reading_user)
+        |> get("/api/v1/accounts/#{user.nickname}")
+
+      Pleroma.Config.put([:instance, :limit_to_local_content], limit_to_local)
+      assert %{"id" => id} = json_response(conn, 200)
+      assert id == user.id
+    end
   end
 
   test "mascot upload", %{conn: conn} do
@@ -1682,7 +1848,7 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
     following = insert(:user)
 
     capture_log(fn ->
-      {:ok, activity} = TwitterAPI.create_status(following, %{"status" => "test #2hu"})
+      {:ok, activity} = CommonAPI.post(following, %{"status" => "test #2hu"})
 
       {:ok, [_activity]} =
         OStatus.fetch_activity_from_url("https://shitposter.club/notice/2827873")
@@ -1995,25 +2161,52 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
     assert %{"error" => "Record not found"} = json_response(conn_res, 404)
   end
 
-  test "muting / unmuting a user", %{conn: conn} do
-    user = insert(:user)
-    other_user = insert(:user)
+  describe "mute/unmute" do
+    test "with notifications", %{conn: conn} do
+      user = insert(:user)
+      other_user = insert(:user)
 
-    conn =
-      conn
-      |> assign(:user, user)
-      |> post("/api/v1/accounts/#{other_user.id}/mute")
+      conn =
+        conn
+        |> assign(:user, user)
+        |> post("/api/v1/accounts/#{other_user.id}/mute")
 
-    assert %{"id" => _id, "muting" => true} = json_response(conn, 200)
+      response = json_response(conn, 200)
 
-    user = User.get_cached_by_id(user.id)
+      assert %{"id" => _id, "muting" => true, "muting_notifications" => true} = response
+      user = User.get_cached_by_id(user.id)
 
-    conn =
-      build_conn()
-      |> assign(:user, user)
-      |> post("/api/v1/accounts/#{other_user.id}/unmute")
+      conn =
+        build_conn()
+        |> assign(:user, user)
+        |> post("/api/v1/accounts/#{other_user.id}/unmute")
 
-    assert %{"id" => _id, "muting" => false} = json_response(conn, 200)
+      response = json_response(conn, 200)
+      assert %{"id" => _id, "muting" => false, "muting_notifications" => false} = response
+    end
+
+    test "without notifications", %{conn: conn} do
+      user = insert(:user)
+      other_user = insert(:user)
+
+      conn =
+        conn
+        |> assign(:user, user)
+        |> post("/api/v1/accounts/#{other_user.id}/mute", %{"notifications" => "false"})
+
+      response = json_response(conn, 200)
+
+      assert %{"id" => _id, "muting" => true, "muting_notifications" => false} = response
+      user = User.get_cached_by_id(user.id)
+
+      conn =
+        build_conn()
+        |> assign(:user, user)
+        |> post("/api/v1/accounts/#{other_user.id}/unmute")
+
+      response = json_response(conn, 200)
+      assert %{"id" => _id, "muting" => false, "muting_notifications" => false} = response
+    end
   end
 
   test "subscribing / unsubscribing to a user", %{conn: conn} do
@@ -2384,7 +2577,7 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
     conn = get(conn, "/api/v1/instance")
     assert result = json_response(conn, 200)
 
-    email = Pleroma.Config.get([:instance, :email])
+    email = Config.get([:instance, :email])
     # Note: not checking for "max_toot_chars" since it's optional
     assert %{
              "uri" => _,
@@ -2414,7 +2607,7 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
     insert(:user, %{local: false, nickname: "u@peer1.com"})
     insert(:user, %{local: false, nickname: "u@peer2.com"})
 
-    {:ok, _} = TwitterAPI.create_status(user, %{"status" => "cofe"})
+    {:ok, _} = CommonAPI.post(user, %{"status" => "cofe"})
 
     # Stats should count users with missing or nil `info.deactivated` value
     user = User.get_cached_by_id(user.id)
@@ -2426,7 +2619,7 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
       |> Changeset.put_embed(:info, info_change)
       |> User.update_and_set_cache()
 
-    Pleroma.Stats.update_stats()
+    Pleroma.Stats.force_update()
 
     conn = get(conn, "/api/v1/instance")
 
@@ -2444,7 +2637,7 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
     insert(:user, %{local: false, nickname: "u@peer1.com"})
     insert(:user, %{local: false, nickname: "u@peer2.com"})
 
-    Pleroma.Stats.update_stats()
+    Pleroma.Stats.force_update()
 
     conn = get(conn, "/api/v1/instance/peers")
 
@@ -2469,12 +2662,14 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
 
   describe "pinned statuses" do
     setup do
-      Pleroma.Config.put([:instance, :max_pinned_statuses], 1)
-
       user = insert(:user)
       {:ok, activity} = CommonAPI.post(user, %{"status" => "HI!!!"})
 
       [user: user, activity: activity]
+    end
+
+    clear_config([:instance, :max_pinned_statuses]) do
+      Config.put([:instance, :max_pinned_statuses], 1)
     end
 
     test "returns pinned statuses", %{conn: conn, user: user, activity: activity} do
@@ -2507,6 +2702,17 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
                |> json_response(200)
     end
 
+    test "/pin: returns 400 error when activity is not public", %{conn: conn, user: user} do
+      {:ok, dm} = CommonAPI.post(user, %{"status" => "test", "visibility" => "direct"})
+
+      conn =
+        conn
+        |> assign(:user, user)
+        |> post("/api/v1/statuses/#{dm.id}/pin")
+
+      assert json_response(conn, 400) == %{"error" => "Could not pin"}
+    end
+
     test "unpin status", %{conn: conn, user: user, activity: activity} do
       {:ok, _} = CommonAPI.pin(activity.id, user)
 
@@ -2524,6 +2730,15 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
                |> assign(:user, user)
                |> get("/api/v1/accounts/#{user.id}/statuses?pinned=true")
                |> json_response(200)
+    end
+
+    test "/unpin: returns 400 error when activity is not exist", %{conn: conn, user: user} do
+      conn =
+        conn
+        |> assign(:user, user)
+        |> post("/api/v1/statuses/1/unpin")
+
+      assert json_response(conn, 400) == %{"error" => "Could not unpin"}
     end
 
     test "max pinned statuses", %{conn: conn, user: user, activity: activity_one} do
@@ -2549,11 +2764,7 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
 
   describe "cards" do
     setup do
-      Pleroma.Config.put([:rich_media, :enabled], true)
-
-      on_exit(fn ->
-        Pleroma.Config.put([:rich_media, :enabled], false)
-      end)
+      Config.put([:rich_media, :enabled], true)
 
       user = insert(:user)
       %{user: user}
@@ -2564,11 +2775,11 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
 
       card_data = %{
         "image" => "http://ia.media-imdb.com/images/rock.jpg",
-        "provider_name" => "www.imdb.com",
-        "provider_url" => "http://www.imdb.com",
+        "provider_name" => "example.com",
+        "provider_url" => "https://example.com",
         "title" => "The Rock",
         "type" => "link",
-        "url" => "http://www.imdb.com/title/tt0117500/",
+        "url" => "https://example.com/ogp",
         "description" =>
           "Directed by Michael Bay. With Sean Connery, Nicolas Cage, Ed Harris, John Spencer.",
         "pleroma" => %{
@@ -2576,7 +2787,7 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
             "image" => "http://ia.media-imdb.com/images/rock.jpg",
             "title" => "The Rock",
             "type" => "video.movie",
-            "url" => "http://www.imdb.com/title/tt0117500/",
+            "url" => "https://example.com/ogp",
             "description" =>
               "Directed by Michael Bay. With Sean Connery, Nicolas Cage, Ed Harris, John Spencer."
           }
@@ -2617,14 +2828,14 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
                "title" => "Pleroma",
                "description" => "",
                "image" => nil,
-               "provider_name" => "pleroma.social",
-               "provider_url" => "https://pleroma.social",
-               "url" => "https://pleroma.social/",
+               "provider_name" => "example.com",
+               "provider_url" => "https://example.com",
+               "url" => "https://example.com/ogp-missing-data",
                "pleroma" => %{
                  "opengraph" => %{
                    "title" => "Pleroma",
                    "type" => "website",
-                   "url" => "https://pleroma.social/"
+                   "url" => "https://example.com/ogp-missing-data"
                  }
                }
              }
@@ -2702,6 +2913,17 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
                |> json_response(200)
     end
 
+    test "cannot mute already muted conversation", %{conn: conn, user: user, activity: activity} do
+      {:ok, _} = CommonAPI.add_mute(user, activity)
+
+      conn =
+        conn
+        |> assign(:user, user)
+        |> post("/api/v1/statuses/#{activity.id}/mute")
+
+      assert json_response(conn, 400) == %{"error" => "conversation is already muted"}
+    end
+
     test "unmute conversation", %{conn: conn, user: user, activity: activity} do
       {:ok, _} = CommonAPI.add_mute(user, activity)
 
@@ -2746,7 +2968,8 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
                |> post("/api/v1/reports", %{
                  "account_id" => target_user.id,
                  "status_ids" => [activity.id],
-                 "comment" => "bad status!"
+                 "comment" => "bad status!",
+                 "forward" => "false"
                })
                |> json_response(200)
     end
@@ -2768,7 +2991,7 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
       reporter: reporter,
       target_user: target_user
     } do
-      max_size = Pleroma.Config.get([:instance, :max_report_comment_size], 1000)
+      max_size = Config.get([:instance, :max_report_comment_size], 1000)
       comment = String.pad_trailing("a", max_size + 1, "a")
 
       error = %{"error" => "Comment must be up to #{max_size} characters"}
@@ -2778,6 +3001,19 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
                |> assign(:user, reporter)
                |> post("/api/v1/reports", %{"account_id" => target_user.id, "comment" => comment})
                |> json_response(400)
+    end
+
+    test "returns error when account is not exist", %{
+      conn: conn,
+      reporter: reporter,
+      activity: activity
+    } do
+      conn =
+        conn
+        |> assign(:user, reporter)
+        |> post("/api/v1/reports", %{"status_ids" => [activity.id], "account_id" => "foo"})
+
+      assert json_response(conn, 400) == %{"error" => "Account not found"}
     end
   end
 
@@ -2850,6 +3086,7 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
       assert Map.has_key?(emoji, "static_url")
       assert Map.has_key?(emoji, "tags")
       assert is_list(emoji["tags"])
+      assert Map.has_key?(emoji, "category")
       assert Map.has_key?(emoji, "url")
       assert Map.has_key?(emoji, "visible_in_picker")
     end
@@ -2883,15 +3120,12 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
       conn: conn,
       path: path
     } do
-      is_public = Pleroma.Config.get([:instance, :public])
-      Pleroma.Config.put([:instance, :public], false)
+      Config.put([:instance, :public], false)
 
       conn = get(conn, path)
 
       assert conn.status == 302
       assert redirected_to(conn) == "/web/login"
-
-      Pleroma.Config.put([:instance, :public], is_public)
     end
 
     test "does not redirect logged in users to the login page", %{conn: conn, path: path} do
@@ -3152,7 +3386,7 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
     user2 = insert(:user)
     user3 = insert(:user)
 
-    {:ok, replied_to} = TwitterAPI.create_status(user1, %{"status" => "cofe"})
+    {:ok, replied_to} = CommonAPI.post(user1, %{"status" => "cofe"})
 
     # Reply to status from another user
     conn1 =
@@ -3416,6 +3650,417 @@ defmodule Pleroma.Web.MastodonAPI.MastodonAPIControllerTest do
       refute Enum.any?(object.data["oneOf"], fn %{"replies" => %{"totalItems" => total_items}} ->
                total_items == 1
              end)
+    end
+
+    test "does not allow choice index to be greater than options count", %{conn: conn} do
+      user = insert(:user)
+      other_user = insert(:user)
+
+      {:ok, activity} =
+        CommonAPI.post(user, %{
+          "status" => "Am I cute?",
+          "poll" => %{"options" => ["Yes", "No"], "expires_in" => 20}
+        })
+
+      object = Object.normalize(activity)
+
+      conn =
+        conn
+        |> assign(:user, other_user)
+        |> post("/api/v1/polls/#{object.id}/votes", %{"choices" => [2]})
+
+      assert json_response(conn, 422) == %{"error" => "Invalid indices"}
+    end
+
+    test "returns 404 error when object is not exist", %{conn: conn} do
+      user = insert(:user)
+
+      conn =
+        conn
+        |> assign(:user, user)
+        |> post("/api/v1/polls/1/votes", %{"choices" => [0]})
+
+      assert json_response(conn, 404) == %{"error" => "Record not found"}
+    end
+
+    test "returns 404 when poll is private and not available for user", %{conn: conn} do
+      user = insert(:user)
+      other_user = insert(:user)
+
+      {:ok, activity} =
+        CommonAPI.post(user, %{
+          "status" => "Am I cute?",
+          "poll" => %{"options" => ["Yes", "No"], "expires_in" => 20},
+          "visibility" => "private"
+        })
+
+      object = Object.normalize(activity)
+
+      conn =
+        conn
+        |> assign(:user, other_user)
+        |> post("/api/v1/polls/#{object.id}/votes", %{"choices" => [0]})
+
+      assert json_response(conn, 404) == %{"error" => "Record not found"}
+    end
+  end
+
+  describe "GET /api/v1/statuses/:id/favourited_by" do
+    setup do
+      user = insert(:user)
+      {:ok, activity} = CommonAPI.post(user, %{"status" => "test"})
+
+      conn =
+        build_conn()
+        |> assign(:user, user)
+
+      [conn: conn, activity: activity, user: user]
+    end
+
+    test "returns users who have favorited the status", %{conn: conn, activity: activity} do
+      other_user = insert(:user)
+      {:ok, _, _} = CommonAPI.favorite(activity.id, other_user)
+
+      response =
+        conn
+        |> get("/api/v1/statuses/#{activity.id}/favourited_by")
+        |> json_response(:ok)
+
+      [%{"id" => id}] = response
+
+      assert id == other_user.id
+    end
+
+    test "returns empty array when status has not been favorited yet", %{
+      conn: conn,
+      activity: activity
+    } do
+      response =
+        conn
+        |> get("/api/v1/statuses/#{activity.id}/favourited_by")
+        |> json_response(:ok)
+
+      assert Enum.empty?(response)
+    end
+
+    test "does not return users who have favorited the status but are blocked", %{
+      conn: %{assigns: %{user: user}} = conn,
+      activity: activity
+    } do
+      other_user = insert(:user)
+      {:ok, user} = User.block(user, other_user)
+
+      {:ok, _, _} = CommonAPI.favorite(activity.id, other_user)
+
+      response =
+        conn
+        |> assign(:user, user)
+        |> get("/api/v1/statuses/#{activity.id}/favourited_by")
+        |> json_response(:ok)
+
+      assert Enum.empty?(response)
+    end
+
+    test "does not fail on an unauthenticated request", %{conn: conn, activity: activity} do
+      other_user = insert(:user)
+      {:ok, _, _} = CommonAPI.favorite(activity.id, other_user)
+
+      response =
+        conn
+        |> assign(:user, nil)
+        |> get("/api/v1/statuses/#{activity.id}/favourited_by")
+        |> json_response(:ok)
+
+      [%{"id" => id}] = response
+      assert id == other_user.id
+    end
+
+    test "requires authentification for private posts", %{conn: conn, user: user} do
+      other_user = insert(:user)
+
+      {:ok, activity} =
+        CommonAPI.post(user, %{
+          "status" => "@#{other_user.nickname} wanna get some #cofe together?",
+          "visibility" => "direct"
+        })
+
+      {:ok, _, _} = CommonAPI.favorite(activity.id, other_user)
+
+      conn
+      |> assign(:user, nil)
+      |> get("/api/v1/statuses/#{activity.id}/favourited_by")
+      |> json_response(404)
+
+      response =
+        build_conn()
+        |> assign(:user, other_user)
+        |> get("/api/v1/statuses/#{activity.id}/favourited_by")
+        |> json_response(200)
+
+      [%{"id" => id}] = response
+      assert id == other_user.id
+    end
+  end
+
+  describe "GET /api/v1/statuses/:id/reblogged_by" do
+    setup do
+      user = insert(:user)
+      {:ok, activity} = CommonAPI.post(user, %{"status" => "test"})
+
+      conn =
+        build_conn()
+        |> assign(:user, user)
+
+      [conn: conn, activity: activity, user: user]
+    end
+
+    test "returns users who have reblogged the status", %{conn: conn, activity: activity} do
+      other_user = insert(:user)
+      {:ok, _, _} = CommonAPI.repeat(activity.id, other_user)
+
+      response =
+        conn
+        |> get("/api/v1/statuses/#{activity.id}/reblogged_by")
+        |> json_response(:ok)
+
+      [%{"id" => id}] = response
+
+      assert id == other_user.id
+    end
+
+    test "returns empty array when status has not been reblogged yet", %{
+      conn: conn,
+      activity: activity
+    } do
+      response =
+        conn
+        |> get("/api/v1/statuses/#{activity.id}/reblogged_by")
+        |> json_response(:ok)
+
+      assert Enum.empty?(response)
+    end
+
+    test "does not return users who have reblogged the status but are blocked", %{
+      conn: %{assigns: %{user: user}} = conn,
+      activity: activity
+    } do
+      other_user = insert(:user)
+      {:ok, user} = User.block(user, other_user)
+
+      {:ok, _, _} = CommonAPI.repeat(activity.id, other_user)
+
+      response =
+        conn
+        |> assign(:user, user)
+        |> get("/api/v1/statuses/#{activity.id}/reblogged_by")
+        |> json_response(:ok)
+
+      assert Enum.empty?(response)
+    end
+
+    test "does not fail on an unauthenticated request", %{conn: conn, activity: activity} do
+      other_user = insert(:user)
+      {:ok, _, _} = CommonAPI.repeat(activity.id, other_user)
+
+      response =
+        conn
+        |> assign(:user, nil)
+        |> get("/api/v1/statuses/#{activity.id}/reblogged_by")
+        |> json_response(:ok)
+
+      [%{"id" => id}] = response
+      assert id == other_user.id
+    end
+
+    test "requires authentification for private posts", %{conn: conn, user: user} do
+      other_user = insert(:user)
+
+      {:ok, activity} =
+        CommonAPI.post(user, %{
+          "status" => "@#{other_user.nickname} wanna get some #cofe together?",
+          "visibility" => "direct"
+        })
+
+      conn
+      |> assign(:user, nil)
+      |> get("/api/v1/statuses/#{activity.id}/reblogged_by")
+      |> json_response(404)
+
+      response =
+        build_conn()
+        |> assign(:user, other_user)
+        |> get("/api/v1/statuses/#{activity.id}/reblogged_by")
+        |> json_response(200)
+
+      assert [] == response
+    end
+  end
+
+  describe "POST /auth/password, with valid parameters" do
+    setup %{conn: conn} do
+      user = insert(:user)
+      conn = post(conn, "/auth/password?email=#{user.email}")
+      %{conn: conn, user: user}
+    end
+
+    test "it returns 204", %{conn: conn} do
+      assert json_response(conn, :no_content)
+    end
+
+    test "it creates a PasswordResetToken record for user", %{user: user} do
+      token_record = Repo.get_by(Pleroma.PasswordResetToken, user_id: user.id)
+      assert token_record
+    end
+
+    test "it sends an email to user", %{user: user} do
+      token_record = Repo.get_by(Pleroma.PasswordResetToken, user_id: user.id)
+
+      email = Pleroma.Emails.UserEmail.password_reset_email(user, token_record.token)
+      notify_email = Config.get([:instance, :notify_email])
+      instance_name = Config.get([:instance, :name])
+
+      assert_email_sent(
+        from: {instance_name, notify_email},
+        to: {user.name, user.email},
+        html_body: email.html_body
+      )
+    end
+  end
+
+  describe "POST /auth/password, with invalid parameters" do
+    setup do
+      user = insert(:user)
+      {:ok, user: user}
+    end
+
+    test "it returns 404 when user is not found", %{conn: conn, user: user} do
+      conn = post(conn, "/auth/password?email=nonexisting_#{user.email}")
+      assert conn.status == 404
+      assert conn.resp_body == ""
+    end
+
+    test "it returns 400 when user is not local", %{conn: conn, user: user} do
+      {:ok, user} = Repo.update(Changeset.change(user, local: false))
+      conn = post(conn, "/auth/password?email=#{user.email}")
+      assert conn.status == 400
+      assert conn.resp_body == ""
+    end
+  end
+
+  describe "POST /api/v1/pleroma/accounts/confirmation_resend" do
+    setup do
+      user = insert(:user)
+      info_change = User.Info.confirmation_changeset(user.info, need_confirmation: true)
+
+      {:ok, user} =
+        user
+        |> Changeset.change()
+        |> Changeset.put_embed(:info, info_change)
+        |> Repo.update()
+
+      assert user.info.confirmation_pending
+
+      [user: user]
+    end
+
+    clear_config([:instance, :account_activation_required]) do
+      Config.put([:instance, :account_activation_required], true)
+    end
+
+    test "resend account confirmation email", %{conn: conn, user: user} do
+      conn
+      |> assign(:user, user)
+      |> post("/api/v1/pleroma/accounts/confirmation_resend?email=#{user.email}")
+      |> json_response(:no_content)
+
+      email = Pleroma.Emails.UserEmail.account_confirmation_email(user)
+      notify_email = Config.get([:instance, :notify_email])
+      instance_name = Config.get([:instance, :name])
+
+      assert_email_sent(
+        from: {instance_name, notify_email},
+        to: {user.name, user.email},
+        html_body: email.html_body
+      )
+    end
+  end
+
+  describe "GET /api/v1/suggestions" do
+    setup do
+      user = insert(:user)
+      other_user = insert(:user)
+      host = Config.get([Pleroma.Web.Endpoint, :url, :host])
+      url500 = "http://test500?#{host}&#{user.nickname}"
+      url200 = "http://test200?#{host}&#{user.nickname}"
+
+      mock(fn
+        %{method: :get, url: ^url500} ->
+          %Tesla.Env{status: 500, body: "bad request"}
+
+        %{method: :get, url: ^url200} ->
+          %Tesla.Env{
+            status: 200,
+            body:
+              ~s([{"acct":"yj455","avatar":"https://social.heldscal.la/avatar/201.jpeg","avatar_static":"https://social.heldscal.la/avatar/s/201.jpeg"}, {"acct":"#{
+                other_user.ap_id
+              }","avatar":"https://social.heldscal.la/avatar/202.jpeg","avatar_static":"https://social.heldscal.la/avatar/s/202.jpeg"}])
+          }
+      end)
+
+      [user: user, other_user: other_user]
+    end
+
+    clear_config(:suggestions)
+
+    test "returns empty result when suggestions disabled", %{conn: conn, user: user} do
+      Config.put([:suggestions, :enabled], false)
+
+      res =
+        conn
+        |> assign(:user, user)
+        |> get("/api/v1/suggestions")
+        |> json_response(200)
+
+      assert res == []
+    end
+
+    test "returns error", %{conn: conn, user: user} do
+      Config.put([:suggestions, :enabled], true)
+      Config.put([:suggestions, :third_party_engine], "http://test500?{{host}}&{{user}}")
+
+      res =
+        conn
+        |> assign(:user, user)
+        |> get("/api/v1/suggestions")
+        |> json_response(500)
+
+      assert res == "Something went wrong"
+    end
+
+    test "returns suggestions", %{conn: conn, user: user, other_user: other_user} do
+      Config.put([:suggestions, :enabled], true)
+      Config.put([:suggestions, :third_party_engine], "http://test200?{{host}}&{{user}}")
+
+      res =
+        conn
+        |> assign(:user, user)
+        |> get("/api/v1/suggestions")
+        |> json_response(200)
+
+      assert res == [
+               %{
+                 "acct" => "yj455",
+                 "avatar" => "https://social.heldscal.la/avatar/201.jpeg",
+                 "avatar_static" => "https://social.heldscal.la/avatar/s/201.jpeg",
+                 "id" => 0
+               },
+               %{
+                 "acct" => other_user.ap_id,
+                 "avatar" => "https://social.heldscal.la/avatar/202.jpeg",
+                 "avatar_static" => "https://social.heldscal.la/avatar/s/202.jpeg",
+                 "id" => other_user.id
+               }
+             ]
     end
   end
 end

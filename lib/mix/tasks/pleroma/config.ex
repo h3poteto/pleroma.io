@@ -1,20 +1,13 @@
+# Pleroma: A lightweight social networking server
+# Copyright © 2017-2019 Pleroma Authors <https://pleroma.social/>
+# SPDX-License-Identifier: AGPL-3.0-only
+
 defmodule Mix.Tasks.Pleroma.Config do
+  @doc false
   use Mix.Task
   import Mix.Pleroma
   alias Pleroma.Repo
   alias Pleroma.Web.AdminAPI.Config
-  @shortdoc "Manages the location of the config"
-  @moduledoc """
-  Manages the location of the config.
-
-  ## Transfers config from file to DB.
-
-      mix pleroma.config migrate_to_db
-
-  ## Transfers config from DB to file.
-
-      mix pleroma.config migrate_from_db ENV
-  """
 
   def run(["migrate_to_db"]) do
     start_pleroma()
@@ -24,6 +17,14 @@ defmodule Mix.Tasks.Pleroma.Config do
       |> Enum.reject(fn {k, _v} -> k in [Pleroma.Repo, :env] end)
       |> Enum.each(fn {k, v} ->
         key = to_string(k) |> String.replace("Elixir.", "")
+
+        key =
+          if String.starts_with?(key, "Pleroma.") do
+            key
+          else
+            ":" <> key
+          end
+
         {:ok, _} = Config.update_or_create(%{group: "pleroma", key: key, value: v})
         Mix.shell().info("#{key} is migrated.")
       end)
@@ -49,17 +50,9 @@ defmodule Mix.Tasks.Pleroma.Config do
 
       Repo.all(Config)
       |> Enum.each(fn config ->
-        mark =
-          if String.starts_with?(config.key, "Pleroma.") or
-               String.starts_with?(config.key, "Ueberauth"),
-             do: ",",
-             else: ":"
-
         IO.write(
           file,
-          "config :#{config.group}, #{config.key}#{mark} #{
-            inspect(Config.from_binary(config.value))
-          }\r\n"
+          "config :#{config.group}, #{config.key}, #{inspect(Config.from_binary(config.value))}\r\n\r\n"
         )
 
         if delete? do

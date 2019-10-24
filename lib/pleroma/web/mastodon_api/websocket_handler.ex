@@ -8,6 +8,7 @@ defmodule Pleroma.Web.MastodonAPI.WebsocketHandler do
   alias Pleroma.Repo
   alias Pleroma.User
   alias Pleroma.Web.OAuth.Token
+  alias Pleroma.Web.Streamer
 
   @behaviour :cowboy_websocket
 
@@ -24,14 +25,15 @@ defmodule Pleroma.Web.MastodonAPI.WebsocketHandler do
   ]
   @anonymous_streams ["public", "public:local", "hashtag"]
 
-  # Handled by periodic keepalive in Pleroma.Web.Streamer.
+  # Handled by periodic keepalive in Pleroma.Web.Streamer.Ping.
   @timeout :infinity
 
   def init(%{qs: qs} = req, state) do
     with params <- :cow_qs.parse_qs(qs),
+         sec_websocket <- :cowboy_req.header("sec-websocket-protocol", req, nil),
          access_token <- List.keyfind(params, "access_token", 0),
          {_, stream} <- List.keyfind(params, "stream", 0),
-         {:ok, user} <- allow_request(stream, access_token),
+         {:ok, user} <- allow_request(stream, [access_token, sec_websocket]),
          topic when is_binary(topic) <- expand_topic(stream, params) do
       {:cowboy_websocket, req, %{user: user, topic: topic}, %{idle_timeout: @timeout}}
     else
@@ -64,7 +66,7 @@ defmodule Pleroma.Web.MastodonAPI.WebsocketHandler do
       }, topic #{state.topic}"
     )
 
-    Pleroma.Web.Streamer.add_socket(state.topic, streamer_socket(state))
+    Streamer.add_socket(state.topic, streamer_socket(state))
     {:ok, state}
   end
 
@@ -79,18 +81,26 @@ defmodule Pleroma.Web.MastodonAPI.WebsocketHandler do
       }, topic #{state.topic || "?"}: #{inspect(reason)}"
     )
 
-    Pleroma.Web.Streamer.remove_socket(state.topic, streamer_socket(state))
+    Streamer.remove_socket(state.topic, streamer_socket(state))
     :ok
   end
 
   # Public streams without authentication.
-  defp allow_request(stream, nil) when stream in @anonymous_streams do
+  defp allow_request(stream, [nil, nil]) when stream in @anonymous_streams do
     {:ok, nil}
   end
 
   # Authenticated streams.
-  defp allow_request(stream, {"access_token", access_token}) when stream in @streams do
-    with %Token{user_id: user_id} <- Repo.get_by(Token, token: access_token),
+  defp allow_request(stream, [access_token, sec_websocket]) when stream in @streams do
+    token =
+      with {"access_token", token} <- access_token do
+        token
+      else
+        _ -> sec_websocket
+      end
+
+    with true <- is_bitstring(token),
+         %Token{user_id: user_id} <- Repo.get_by(Token, token: token),
          user = %User{} <- User.get_cached_by_id(user_id) do
       {:ok, user}
     else

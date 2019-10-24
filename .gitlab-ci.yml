@@ -30,8 +30,8 @@ build:
 
 docs-build:
   stage: build
-  only:
-  - master@pleroma/pleroma
+  only: &docs-only
+  - stable@pleroma/pleroma
   - develop@pleroma/pleroma
   variables:
     MIX_ENV: dev
@@ -85,9 +85,7 @@ analysis:
 docs-deploy:
   stage: deploy
   image: alpine:3.9
-  only:
-  - master@pleroma/pleroma
-  - develop@pleroma/pleroma
+  only: *docs-only
   before_script:
     - apk update && apk add openssh-client rsync
   script:
@@ -148,8 +146,10 @@ amd64:
   # TODO: Replace with upstream image when 1.9.0 comes out
   image: rinpatch/elixir:1.9.0-rc.0
   only: &release-only
-  - master@pleroma/pleroma
+  - stable@pleroma/pleroma
   - develop@pleroma/pleroma
+  - /^maint/.*$/@pleroma/pleroma
+  - /^release/.*$/@pleroma/pleroma
   artifacts: &release-artifacts
     name: "pleroma-$CI_COMMIT_REF_NAME-$CI_COMMIT_SHORT_SHA-$CI_JOB_NAME"
     paths:

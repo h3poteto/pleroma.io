@@ -8,7 +8,7 @@ If you run Pleroma with ``MIX_ENV=prod`` the file is ``prod.secret.exs``, otherw
 * `filters`: List of `Pleroma.Upload.Filter` to use.
 * `link_name`: When enabled Pleroma will add a `name` parameter to the url of the upload, for example `https://instance.tld/media/corndog.png?name=corndog.png`. This is needed to provide the correct filename in Content-Disposition headers when using filters like `Pleroma.Upload.Filter.Dedupe`
 * `base_url`: The base URL to access a user-uploaded file. Useful when you want to proxy the media files via another host.
-* `proxy_remote`: If you\'re using a remote uploader, Pleroma will proxy media requests instead of redirecting to it.
+* `proxy_remote`: If you're using a remote uploader, Pleroma will proxy media requests instead of redirecting to it.
 * `proxy_opts`: Proxy options, see `Pleroma.ReverseProxy` documentation.
 
 Note: `strip_exif` has been replaced by `Pleroma.Upload.Filter.Mogrify`.
@@ -18,6 +18,7 @@ Note: `strip_exif` has been replaced by `Pleroma.Upload.Filter.Mogrify`.
 
 ## Pleroma.Uploaders.S3
 * `bucket`: S3 bucket name
+* `bucket_namespace`: S3 bucket namespace
 * `public_endpoint`: S3 endpoint that the user finally accesses(ex. "https://s3.dualstack.ap-northeast-1.amazonaws.com")
 * `truncated_namespace`: If you use S3 compatible service such as Digital Ocean Spaces or CDN, set folder name or "" etc.
 For example, when using CDN to S3 virtual host format, set "".
@@ -25,7 +26,7 @@ At this time, write CNAME to CDN in public_endpoint.
 
 ## Pleroma.Upload.Filter.Mogrify
 
-* `args`: List of actions for the `mogrify` command like `"strip"` or `["strip", "auto-orient", {"impode", "1"}]`.
+* `args`: List of actions for the `mogrify` command like `"strip"` or `["strip", "auto-orient", {"implode", "1"}]`.
 
 ## Pleroma.Upload.Filter.Dedupe
 
@@ -36,11 +37,12 @@ No specific configuration.
 This filter replaces the filename (not the path) of an upload. For complete obfuscation, add
 `Pleroma.Upload.Filter.Dedupe` before AnonymizeFilename.
 
-* `text`: Text to replace filenames in links. If empty, `{random}.extension` will be used.
+* `text`: Text to replace filenames in links. If empty, `{random}.extension` will be used. You can get the original filename extension by using `{extension}`, for example `custom-file-name.{extension}`.
 
 ## Pleroma.Emails.Mailer
 * `adapter`: one of the mail adapters listed in [Swoosh readme](https://github.com/swoosh/swoosh#adapters), or `Swoosh.Adapters.Local` for in-memory mailbox.
 * `api_key` / `password` and / or other adapter-specific settings, per the above documentation.
+* `enabled`: Allows enable/disable send  emails. Default: `false`.
 
 An example for Sendgrid adapter:
 
@@ -99,6 +101,8 @@ config :pleroma, Pleroma.Emails.Mailer,
   * `Pleroma.Web.ActivityPub.MRF.RejectNonPublic`: Drops posts with non-public visibility settings (See ``:mrf_rejectnonpublic`` section)
   * `Pleroma.Web.ActivityPub.MRF.EnsureRePrepended`: Rewrites posts to ensure that replies to posts with subjects do not have an identical subject and instead begin with re:.
   * `Pleroma.Web.ActivityPub.MRF.AntiLinkSpamPolicy`: Rejects posts from likely spambots by rejecting posts from new users that contain links.
+  * `Pleroma.Web.ActivityPub.MRF.MediaProxyWarmingPolicy`: Crawls attachments using their MediaProxy URLs so that the MediaProxy cache is primed.
+  * `Pleroma.Web.ActivityPub.MRF.MentionPolicy`: Drops posts mentioning configurable users. (see `:mrf_mention` section)
   * `Pleroma.Web.ActivityPub.MRF.VocabularyPolicy`: Restricts activities to a configured set of vocabulary. (see `:mrf_vocabulary` section)
 * `public`: Makes the client API in authentificated mode-only except for user-profiles. Useful for disabling the Local Timeline and The Whole Known Network.
 * `quarantined_instances`: List of ActivityPub instances where private(DMs, followers-only) activities will not be send.
@@ -123,9 +127,16 @@ config :pleroma, Pleroma.Emails.Mailer,
 * `safe_dm_mentions`: If set to true, only mentions at the beginning of a post will be used to address people in direct messages. This is to prevent accidental mentioning of people when talking about them (e.g. "@friend hey i really don't like @enemy"). Default: `false`.
 * `healthcheck`: If set to true, system data will be shown on ``/api/pleroma/healthcheck``.
 * `remote_post_retention_days`: The default amount of days to retain remote posts when pruning the database.
+* `user_bio_length`: A user bio maximum length (default: `5000`)
+* `user_name_length`: A user name maximum length (default: `100`)
 * `skip_thread_containment`: Skip filter out broken threads. The default is `false`.
 * `limit_to_local_content`: Limit unauthenticated users to search for local statutes and users only. Possible values: `:unauthenticated`, `:all` and `false`. The default is `:unauthenticated`.
-* `dynamic_configuration`: Allow transferring configuration to DB with the subsequent customization from Admin api.
+* `max_account_fields`: The maximum number of custom fields in the user profile (default: `10`)
+* `max_remote_account_fields`: The maximum number of custom fields in the remote user profile (default: `20`)
+* `account_field_name_length`: An account field name maximum length (default: `512`)
+* `account_field_value_length`: An account field value maximum length (default: `512`)
+* `external_user_synchronization`: Enabling following/followers counters synchronization for external users.
+
 
 
 ## :logger
@@ -268,6 +279,9 @@ config :pleroma, :mrf_subchain,
 * `federated_timeline_removal`: A list of patterns which result in message being removed from federated timelines (a.k.a unlisted), each pattern can be a string or a [regular expression](https://hexdocs.pm/elixir/Regex.html)
 * `replace`: A list of tuples containing `{pattern, replacement}`, `pattern` can be a string or a [regular expression](https://hexdocs.pm/elixir/Regex.html)
 
+## :mrf_mention
+* `actors`: A list of actors, for which to drop any posts mentioning.
+
 ## :mrf_vocabulary
 * `accept`: A list of ActivityStreams terms to accept.  If empty, all supported messages are accepted.
 * `reject`: A list of ActivityStreams terms to reject.  If empty, no messages are rejected.
@@ -286,7 +300,7 @@ config :pleroma, :mrf_subchain,
 
 ## Pleroma.Web.Endpoint
 `Phoenix` endpoint configuration, all configuration options can be viewed [here](https://hexdocs.pm/phoenix/Phoenix.Endpoint.html#module-dynamic-configuration), only common options are listed here
-* `http` - a list containing http protocol configuration, all configuration options can be viewed [here](https://hexdocs.pm/plug_cowboy/Plug.Cowboy.html#module-options), only common options are listed here
+* `http` - a list containing http protocol configuration, all configuration options can be viewed [here](https://hexdocs.pm/plug_cowboy/Plug.Cowboy.html#module-options), only common options are listed here. For deployment using docker, you need to set this to `[ip: {0,0,0,0}, port: 4000]` to make pleroma accessible from other containers (such as your nginx server).
   - `ip` - a tuple consisting of 4 integers
   - `port`
 * `url` - a list containing the configuration for generating urls, accepts
@@ -328,6 +342,7 @@ This will make Pleroma listen on `127.0.0.1` port `8080` and generate urls start
 * ``unfollow_blocked``: Whether blocks result in people getting unfollowed
 * ``outgoing_blocks``: Whether to federate blocks to other instances
 * ``deny_follow_blocked``: Whether to disallow following an account that has blocked the user in question
+* ``sign_object_fetches``: Sign object fetches with HTTP signatures
 
 ## :http_security
 * ``enabled``: Whether the managed content security policy is enabled
@@ -425,6 +440,7 @@ This config contains two queues: `federator_incoming` and `federator_outgoing`. 
 * `enabled`: if enabled the instance will parse metadata from attached links to generate link previews
 * `ignore_hosts`: list of hosts which will be ignored by the metadata parser. For example `["accounts.google.com", "xss.website"]`, defaults to `[]`.
 * `ignore_tld`: list TLDs (top-level domains) which will ignore for parse metadata. default is ["local", "localdomain", "lan"]
+* `parsers`: list of Rich Media parsers
 
 ## :fetch_initial_posts
 * `enabled`: if enabled, when a new user is federated with, fetch some of their latest posts
@@ -478,6 +494,10 @@ config :auto_linker,
 * `total_user_limit`: the number of scheduled activities a user is allowed to create in total (Default: `300`)
 * `enabled`: whether scheduled activities are sent to the job queue to be executed
 
+## Pleroma.ActivityExpiration
+
+# `enabled`: whether expired activities will be sent to the job queue to be deleted
+
 ## Pleroma.Web.Auth.Authenticator
 
 * `Pleroma.Web.Auth.PleromaAuthenticator`: default database authenticator
@@ -529,6 +549,23 @@ Authentication / authorization settings.
 * `auth_template`: authentication form template. By default it's `show.html` which corresponds to `lib/pleroma/web/templates/o_auth/o_auth/show.html.eex`.
 * `oauth_consumer_template`: OAuth consumer mode authentication form template. By default it's `consumer.html` which corresponds to `lib/pleroma/web/templates/o_auth/o_auth/consumer.html.eex`.
 * `oauth_consumer_strategies`: the list of enabled OAuth consumer strategies; by default it's set by `OAUTH_CONSUMER_STRATEGIES` environment variable. Each entry in this space-delimited string should be of format `<strategy>` or `<strategy>:<dependency>` (e.g. `twitter` or `keycloak:ueberauth_keycloak_strategy` in case dependency is named differently than `ueberauth_<strategy>`).
+
+## :email_notifications
+
+Email notifications settings.
+
+  - digest - emails of "what you've missed" for users who have been
+    inactive for a while.
+    - active: globally enable or disable digest emails
+    - schedule: When to send digest email, in [crontab format](https://en.wikipedia.org/wiki/Cron).
+      "0 0 * * 0" is the default, meaning "once a week at midnight on Sunday morning"
+    - interval: Minimum interval between digest emails to one user
+    - inactivity_threshold: Minimum user inactivity threshold
+
+## Pleroma.Emails.UserEmail
+
+- `:logo` - a path to a custom logo. Set it to `nil` to use the default Pleroma logo.
+- `:styling` - a map with color settings for email templates.
 
 ## OAuth consumer mode
 
@@ -633,6 +670,8 @@ This will probably take a long time.
 
 ## :rate_limit
 
+This is an advanced feature and disabled by default.
+
 A keyword list of rate limiters where a key is a limiter name and value is the limiter configuration. The basic configuration is a tuple where:
 
 * The first element: `scale` (Integer). The time scale in milliseconds.
@@ -641,3 +680,21 @@ A keyword list of rate limiters where a key is a limiter name and value is the l
 It is also possible to have different limits for unauthenticated and authenticated users: the keyword value must be a list of two tuples where the first one is a config for unauthenticated users and the second one is for authenticated.
 
 See [`Pleroma.Plugs.RateLimiter`](Pleroma.Plugs.RateLimiter.html) documentation for examples.
+
+Supported rate limiters:
+
+* `:search` for the search requests (account & status search etc.)
+* `:app_account_creation` for registering user accounts from the same IP address
+* `:relations_actions` for actions on relations with all users (follow, unfollow)
+* `:relation_id_action` for actions on relation with a specific user (follow, unfollow)
+* `:statuses_actions` for create / delete / fav / unfav / reblog / unreblog actions on any statuses
+* `:status_id_action` for fav / unfav or reblog / unreblog actions on the same status by the same user
+
+## :web_cache_ttl
+
+The expiration time for the web responses cache. Values should be in milliseconds or `nil` to disable expiration.
+
+Available caches:
+
+* `:activity_pub` - activity pub routes (except question activities). Defaults to `nil` (no expiration).
+* `:activity_pub_question` - activity pub routes (question activities). Defaults to `30_000` (30 seconds).

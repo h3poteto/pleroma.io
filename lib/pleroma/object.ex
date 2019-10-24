@@ -38,13 +38,39 @@ defmodule Pleroma.Object do
   def get_by_id(nil), do: nil
   def get_by_id(id), do: Repo.get(Object, id)
 
+  def get_by_id_and_maybe_refetch(id, opts \\ []) do
+    %{updated_at: updated_at} = object = get_by_id(id)
+
+    if opts[:interval] &&
+         NaiveDateTime.diff(NaiveDateTime.utc_now(), updated_at) > opts[:interval] do
+      case Fetcher.refetch_object(object) do
+        {:ok, %Object{} = object} ->
+          object
+
+        e ->
+          Logger.error("Couldn't refresh #{object.data["id"]}:\n#{inspect(e)}")
+          object
+      end
+    else
+      object
+    end
+  end
+
   def get_by_ap_id(nil), do: nil
 
   def get_by_ap_id(ap_id) do
     Repo.one(from(object in Object, where: fragment("(?)->>'id' = ?", object.data, ^ap_id)))
   end
 
+  defp warn_on_no_object_preloaded(ap_id) do
+    "Object.normalize() called without preloaded object (#{ap_id}). Consider preloading the object"
+    |> Logger.debug()
+
+    Logger.debug("Backtrace: #{inspect(Process.info(:erlang.self(), :current_stacktrace))}")
+  end
+
   def normalize(_, fetch_remote \\ true, options \\ [])
+
   # If we pass an Activity to Object.normalize(), we can try to use the preloaded object.
   # Use this whenever possible, especially when walking graphs in an O(N) loop!
   def normalize(%Object{} = object, _, _), do: object
@@ -55,25 +81,15 @@ defmodule Pleroma.Object do
     %Object{id: "pleroma:fake_object_id", data: data}
   end
 
-  # Catch and log Object.normalize() calls where the Activity's child object is not
-  # preloaded.
+  # No preloaded object
   def normalize(%Activity{data: %{"object" => %{"id" => ap_id}}}, fetch_remote, _) do
-    Logger.debug(
-      "Object.normalize() called without preloaded object (#{ap_id}).  Consider preloading the object!"
-    )
-
-    Logger.debug("Backtrace: #{inspect(Process.info(:erlang.self(), :current_stacktrace))}")
-
+    warn_on_no_object_preloaded(ap_id)
     normalize(ap_id, fetch_remote)
   end
 
+  # No preloaded object
   def normalize(%Activity{data: %{"object" => ap_id}}, fetch_remote, _) do
-    Logger.debug(
-      "Object.normalize() called without preloaded object (#{ap_id}).  Consider preloading the object!"
-    )
-
-    Logger.debug("Backtrace: #{inspect(Process.info(:erlang.self(), :current_stacktrace))}")
-
+    warn_on_no_object_preloaded(ap_id)
     normalize(ap_id, fetch_remote)
   end
 
@@ -132,14 +148,16 @@ defmodule Pleroma.Object do
   def delete(%Object{data: %{"id" => id}} = object) do
     with {:ok, _obj} = swap_object_with_tombstone(object),
          deleted_activity = Activity.delete_by_ap_id(id),
-         {:ok, true} <- Cachex.del(:object_cache, "object:#{id}") do
+         {:ok, true} <- Cachex.del(:object_cache, "object:#{id}"),
+         {:ok, _} <- Cachex.del(:web_resp_cache, URI.parse(id).path) do
       {:ok, object, deleted_activity}
     end
   end
 
   def prune(%Object{data: %{"id" => id}} = object) do
     with {:ok, object} <- Repo.delete(object),
-         {:ok, true} <- Cachex.del(:object_cache, "object:#{id}") do
+         {:ok, true} <- Cachex.del(:object_cache, "object:#{id}"),
+         {:ok, _} <- Cachex.del(:web_resp_cache, URI.parse(id).path) do
       {:ok, object}
     end
   end
@@ -152,8 +170,6 @@ defmodule Pleroma.Object do
   def update_and_set_cache(changeset) do
     with {:ok, object} <- Repo.update(changeset) do
       set_cache(object)
-    else
-      e -> e
     end
   end
 
@@ -165,7 +181,7 @@ defmodule Pleroma.Object do
         data:
           fragment(
             """
-            jsonb_set(?, '{repliesCount}',
+            safe_jsonb_set(?, '{repliesCount}',
               (coalesce((?->>'repliesCount')::int, 0) + 1)::varchar::jsonb, true)
             """,
             o.data,
@@ -188,7 +204,7 @@ defmodule Pleroma.Object do
         data:
           fragment(
             """
-            jsonb_set(?, '{repliesCount}',
+            safe_jsonb_set(?, '{repliesCount}',
               (greatest(0, (?->>'repliesCount')::int - 1))::varchar::jsonb, true)
             """,
             o.data,

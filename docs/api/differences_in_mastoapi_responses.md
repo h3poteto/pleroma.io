@@ -16,13 +16,17 @@ Adding the parameter `with_muted=true` to the timeline queries will also return 
 
 ## Statuses
 
+- `visibility`: has an additional possible value `list`
+
 Has these additional fields under the `pleroma` object:
 
-- `local`: true if the post was made on the local instance.
+- `local`: true if the post was made on the local instance
 - `conversation_id`: the ID of the conversation the status is associated with (if any)
 - `in_reply_to_account_acct`: the `acct` property of User entity for replied user (if any)
 - `content`: a map consisting of alternate representations of the `content` property with the key being it's mimetype. Currently the only alternate representation supported is `text/plain`
 - `spoiler_text`: a map consisting of alternate representations of the `spoiler_text` property with the key being it's mimetype. Currently the only alternate representation supported is `text/plain`
+- `expires_at`: a datetime (iso8601) that states when the post will expire (be deleted automatically), or empty if the post won't expire
+- `thread_muted`: true if the thread the post belongs to is muted
 
 ## Attachments
 
@@ -32,7 +36,10 @@ Has these additional fields under the `pleroma` object:
 
 ## Accounts
 
-- `/api/v1/accounts/:id`: The `id` parameter can also be the `nickname` of the user. This only works in this endpoint, not the deeper nested ones for following etc.
+The `id` parameter can also be the `nickname` of the user. This only works in these endpoints, not the deeper nested ones for following etc.
+
+- `/api/v1/accounts/:id`
+- `/api/v1/accounts/:id/statuses`
 
 Has these additional fields under the `pleroma` object:
 
@@ -45,6 +52,7 @@ Has these additional fields under the `pleroma` object:
 - `hide_follows`: boolean, true when the user has follow hiding enabled
 - `settings_store`: A generic map of settings for frontends. Opaque to the backend. Only returned in `verify_credentials` and `update_credentials`
 - `chat_token`: The token needed for Pleroma chat. Only returned in `verify_credentials`
+- `deactivated`: boolean, true when the user is deactivated
 
 ### Source
 
@@ -53,11 +61,18 @@ Has these additional fields under the `pleroma` object:
 - `show_role`: boolean, nullable, true when the user wants his role (e.g admin, moderator) to be shown
 - `no_rich_text` - boolean, nullable, true when html tags are stripped from all statuses requested from the API
 
+## Conversations
+
+Has an additional field under the `pleroma` object:
+
+- `recipients`: The list of the recipients of this Conversation. These will be addressed when replying to this conversation.
+
 ## Account Search
 
 Behavior has changed:
 
 - `/api/v1/accounts/search`: Does not require authentication
+
 
 ## Notifications
 
@@ -72,6 +87,23 @@ Additional parameters can be added to the JSON body/Form data:
 - `preview`: boolean, if set to `true` the post won't be actually posted, but the status entitiy would still be rendered back. This could be useful for previewing rich text/custom emoji, for example.
 - `content_type`: string, contain the MIME type of the status, it is transformed into HTML by the backend. You can get the list of the supported MIME types with the nodeinfo endpoint.
 - `to`: A list of nicknames (like `lain@soykaf.club` or `lain` on the local server) that will be used to determine who is going to be addressed by this post. Using this will disable the implicit addressing by mentioned names in the `status` body, only the people in the `to` list will be addressed. The normal rules for for post visibility are not affected by this and will still apply.
+- `visibility`: string, besides standard MastoAPI values (`direct`, `private`, `unlisted` or `public`) it can be used to address a List by setting it to `list:LIST_ID`.
+- `expires_in`: The number of seconds the posted activity should expire in. When a posted activity expires it will be deleted from the server, and a delete request for it will be federated. This needs to be longer than an hour.
+- `in_reply_to_conversation_id`: Will reply to a given conversation, addressing only the people who are part of the recipient set of that conversation. Sets the visibility to `direct`.
+
+## GET `/api/v1/statuses`
+
+An endpoint to get multiple statuses by IDs.
+
+Required parameters:
+
+- `ids`: array of activity ids
+
+Usage example: `GET /api/v1/statuses/?ids[]=1&ids[]=2`.
+
+Returns: array of Status.
+
+The maximum number of statuses is limited to 100 per request.
 
 ## PATCH `/api/v1/update_credentials`
 

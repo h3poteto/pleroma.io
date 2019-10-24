@@ -1,9 +1,10 @@
 # Pleroma: A lightweight social networking server
-# Copyright © 2017-2018 Pleroma Authors <https://pleroma.social/>
+# Copyright © 2017-2019 Pleroma Authors <https://pleroma.social/>
 # SPDX-License-Identifier: AGPL-3.0-only
 
 defmodule Pleroma.Factory do
   use ExMachina.Ecto, repo: Pleroma.Repo
+  alias Pleroma.Object
   alias Pleroma.User
 
   def participation_factory do
@@ -30,13 +31,15 @@ defmodule Pleroma.Factory do
       nickname: sequence(:nickname, &"nick#{&1}"),
       password_hash: Comeonin.Pbkdf2.hashpwsalt("test"),
       bio: sequence(:bio, &"Tester Number #{&1}"),
-      info: %{}
+      info: %{},
+      last_digest_emailed_at: NaiveDateTime.utc_now()
     }
 
     %{
       user
       | ap_id: User.ap_id(user),
         follower_address: User.ap_followers(user),
+        following_address: User.ap_following(user),
         following: [User.ap_id(user)]
     }
   end
@@ -117,21 +120,46 @@ defmodule Pleroma.Factory do
     user = attrs[:user] || insert(:user)
     note = attrs[:note] || insert(:note, user: user)
 
-    data = %{
-      "id" => Pleroma.Web.ActivityPub.Utils.generate_activity_id(),
-      "type" => "Create",
-      "actor" => note.data["actor"],
-      "to" => note.data["to"],
-      "object" => note.data,
-      "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
-      "context" => note.data["context"]
-    }
+    data_attrs = attrs[:data_attrs] || %{}
+    attrs = Map.drop(attrs, [:user, :note, :data_attrs])
+
+    data =
+      %{
+        "id" => Pleroma.Web.ActivityPub.Utils.generate_activity_id(),
+        "type" => "Create",
+        "actor" => note.data["actor"],
+        "to" => note.data["to"],
+        "object" => note.data["id"],
+        "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
+        "context" => note.data["context"]
+      }
+      |> Map.merge(data_attrs)
 
     %Pleroma.Activity{
       data: data,
       actor: data["actor"],
       recipients: data["to"]
     }
+    |> Map.merge(attrs)
+  end
+
+  defp expiration_offset_by_minutes(attrs, minutes) do
+    scheduled_at =
+      NaiveDateTime.utc_now()
+      |> NaiveDateTime.add(:timer.minutes(minutes), :millisecond)
+      |> NaiveDateTime.truncate(:second)
+
+    %Pleroma.ActivityExpiration{}
+    |> Map.merge(attrs)
+    |> Map.put(:scheduled_at, scheduled_at)
+  end
+
+  def expiration_in_the_past_factory(attrs \\ %{}) do
+    expiration_offset_by_minutes(attrs, -60)
+  end
+
+  def expiration_in_the_future_factory(attrs \\ %{}) do
+    expiration_offset_by_minutes(attrs, 61)
   end
 
   def article_activity_factory do
@@ -174,17 +202,20 @@ defmodule Pleroma.Factory do
     }
   end
 
-  def like_activity_factory do
-    note_activity = insert(:note_activity)
+  def like_activity_factory(attrs \\ %{}) do
+    note_activity = attrs[:note_activity] || insert(:note_activity)
+    object = Object.normalize(note_activity)
     user = insert(:user)
 
-    data = %{
-      "id" => Pleroma.Web.ActivityPub.Utils.generate_activity_id(),
-      "actor" => user.ap_id,
-      "type" => "Like",
-      "object" => note_activity.data["object"]["id"],
-      "published_at" => DateTime.utc_now() |> DateTime.to_iso8601()
-    }
+    data =
+      %{
+        "id" => Pleroma.Web.ActivityPub.Utils.generate_activity_id(),
+        "actor" => user.ap_id,
+        "type" => "Like",
+        "object" => object.data["id"],
+        "published_at" => DateTime.utc_now() |> DateTime.to_iso8601()
+      }
+      |> Map.merge(attrs[:data_attrs] || %{})
 
     %Pleroma.Activity{
       data: data

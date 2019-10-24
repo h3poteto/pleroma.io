@@ -38,7 +38,9 @@ Authentication is required and the user must be an admin.
         "moderator": bool
       },
       "local": bool,
-      "tags": array
+      "tags": array,
+      "avatar": string,
+      "display_name": string
     },
     ...
   ]
@@ -58,9 +60,13 @@ Authentication is required and the user must be an admin.
 
 - Method: `POST`
 - Params:
-  - `nickname`
-  - `email`
-  - `password`
+  `users`: [
+    {
+      `nickname`,
+      `email`,
+      `password`
+    }
+  ]
 - Response: User’s nickname
 
 ## `/api/pleroma/admin/users/follow`
@@ -174,16 +180,29 @@ Note: Available `:permission_group` is currently moderator and admin. 404 is ret
   - `nickname`
   - `status` BOOLEAN field, false value means deactivation.
 
-## `/api/pleroma/admin/users/:nickname`
+## `/api/pleroma/admin/users/:nickname_or_id`
 
 ### Retrive the details of a user
 
 - Method: `GET`
 - Params:
-  - `nickname`
+  - `nickname` or `id`
 - Response:
   - On failure: `Not found`
   - On success: JSON of the user
+
+## `/api/pleroma/admin/users/:nickname_or_id/statuses`
+
+### Retrive user's latest statuses
+
+- Method: `GET`
+- Params:
+  - `nickname` or `id`
+  - *optional* `page_size`: number of statuses to return (default is `20`)
+  - *optional* `godmode`: `true`/`false` – allows to see private statuses
+- Response:
+  - On failure: `Not found`
+  - On success: JSON array of user's latest statuses
 
 ## `/api/pleroma/admin/relay`
 
@@ -331,6 +350,7 @@ Note: Available `:permission_group` is currently moderator and admin. 404 is ret
           "pleroma": {},
           "sensitive": false
         },
+        "tags": ["force_unlisted"],
         "statuses_count": 3,
         "url": "https://pleroma.example.org/users/user",
         "username": "user"
@@ -366,6 +386,7 @@ Note: Available `:permission_group` is currently moderator and admin. 404 is ret
           "pleroma": {},
           "sensitive": false
         },
+        "tags": ["force_unlisted"],
         "statuses_count": 1,
         "url": "https://pleroma.example.org/users/lain",
         "username": "lain"
@@ -558,8 +579,32 @@ Note: Available `:permission_group` is currently moderator and admin. 404 is ret
     - 404 Not Found `"Not found"`
   - On success: 200 OK `{}`
 
+
+## `/api/pleroma/admin/config/migrate_to_db`
+### Run mix task pleroma.config migrate_to_db
+Copy settings on key `:pleroma` to DB.
+- Method `GET`
+- Params: none
+- Response:
+
+```json
+{}
+```
+
+## `/api/pleroma/admin/config/migrate_from_db`
+### Run mix task pleroma.config migrate_from_db
+Copy all settings from DB to `config/prod.exported_from_db.secret.exs` with deletion from DB.
+- Method `GET`
+- Params: none
+- Response:
+
+```json
+{}
+```
+
 ## `/api/pleroma/admin/config`
 ### List config settings
+List config settings only works with `:pleroma => :instance => :dynamic_configuration` setting to `true`.
 - Method `GET`
 - Params: none
 - Response:
@@ -569,7 +614,7 @@ Note: Available `:permission_group` is currently moderator and admin. 404 is ret
   configs: [
     {
       "group": string,
-      "key": string,
+      "key": string or string with leading `:` for atoms,
       "value": string or {} or [] or {"tuple": []}
      }
   ]
@@ -578,11 +623,16 @@ Note: Available `:permission_group` is currently moderator and admin. 404 is ret
 
 ## `/api/pleroma/admin/config`
 ### Update config settings
+Updating config settings only works with `:pleroma => :instance => :dynamic_configuration` setting to `true`.
 Module name can be passed as string, which starts with `Pleroma`, e.g. `"Pleroma.Upload"`.
-Atom or boolean value can be passed with `:` in the beginning, e.g. `":true"`, `":upload"`. For keys it is not needed.
-Integer with `i:`, e.g. `"i:150"`.
-Tuple with more than 2 values with `{"tuple": ["first_val", Pleroma.Module, []]}`.
+Atom keys and values can be passed with `:` in the beginning, e.g. `":upload"`.
+Tuples can be passed as `{"tuple": ["first_val", Pleroma.Module, []]}`.
 `{"tuple": ["some_string", "Pleroma.Some.Module", []]}` will be converted to `{"some_string", Pleroma.Some.Module, []}`.
+Keywords can be passed as lists with 2 child tuples, e.g.
+`[{"tuple": ["first_val", Pleroma.Module]}, {"tuple": ["second_val", true]}]`.
+
+If value contains list of settings `[subkey: val1, subkey2: val2, subkey3: val3]`, it's possible to remove only subkeys instead of all settings passing `subkeys` parameter. E.g.:
+{"group": "pleroma", "key": "some_key", "delete": "true", "subkeys": [":subkey", ":subkey3"]}.
 
 Compile time settings (need instance reboot):
 - all settings by this keys:
@@ -599,9 +649,10 @@ Compile time settings (need instance reboot):
 - Params:
   - `configs` => [
     - `group` (string)
-    - `key` (string)
+    - `key` (string or string with leading `:` for atoms)
     - `value` (string, [], {} or {"tuple": []})
     - `delete` = true (optional, if parameter must be deleted)
+    - `subkeys` [(string with leading `:` for atoms)] (optional, works only if `delete=true` parameter is passed, otherwise will be ignored)
   ]
 
 - Request (example):
@@ -612,24 +663,25 @@ Compile time settings (need instance reboot):
     {
       "group": "pleroma",
       "key": "Pleroma.Upload",
-      "value": {
-        "uploader": "Pleroma.Uploaders.Local",
-        "filters": ["Pleroma.Upload.Filter.Dedupe"],
-        "link_name": ":true",
-        "proxy_remote": ":false",
-        "proxy_opts": {
-          "redirect_on_failure": ":false",
-          "max_body_length": "i:1048576",
-          "http": {
-            "follow_redirect": ":true",
-            "pool": ":upload"
-          }
-        },
-        "dispatch": {
+      "value": [
+        {"tuple": [":uploader", "Pleroma.Uploaders.Local"]},
+        {"tuple": [":filters", ["Pleroma.Upload.Filter.Dedupe"]]},
+        {"tuple": [":link_name", true]},
+        {"tuple": [":proxy_remote", false]},
+        {"tuple": [":proxy_opts", [
+          {"tuple": [":redirect_on_failure", false]},
+          {"tuple": [":max_body_length", 1048576]},
+          {"tuple": [":http": [
+            {"tuple": [":follow_redirect", true]},
+            {"tuple": [":pool", ":upload"]},
+          ]]}
+        ]
+        ]},
+        {"tuple": [":dispatch", {
           "tuple": ["/api/v1/streaming", "Pleroma.Web.MastodonAPI.WebsocketHandler", []]
-        }
-      }
-     }
+        }]}
+      ]
+    }
   ]
 }
 
@@ -640,9 +692,33 @@ Compile time settings (need instance reboot):
   configs: [
     {
       "group": string,
-      "key": string,
+      "key": string or string with leading `:` for atoms,
       "value": string or {} or [] or {"tuple": []}
      }
   ]
 }
+```
+
+## `/api/pleroma/admin/moderation_log`
+### Get moderation log
+- Method `GET`
+- Params:
+  - *optional* `page`: **integer** page number
+  - *optional* `page_size`: **integer** number of users per page (default is `50`)
+- Response:
+
+```json
+[
+  {
+    "data": {
+      "actor": {
+        "id": 1,
+        "nickname": "lain"
+      },
+      "action": "relay_follow"
+    },
+    "time": 1502812026, // timestamp
+    "message": "[2017-08-15 15:47:06] @nick0 followed relay: https://example.org/relay" // log message
+  }
+]
 ```

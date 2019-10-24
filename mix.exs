@@ -4,7 +4,7 @@ defmodule Pleroma.Mixfile do
   def project do
     [
       app: :pleroma,
-      version: version("1.0.6"),
+      version: version("1.1.2"),
       elixir: "~> 1.7",
       elixirc_paths: elixirc_paths(Mix.env()),
       compilers: [:phoenix, :gettext] ++ Mix.compilers(),
@@ -14,7 +14,7 @@ defmodule Pleroma.Mixfile do
       aliases: aliases(),
       deps: deps(),
       test_coverage: [tool: ExCoveralls],
-
+      preferred_cli_env: ["coveralls.html": :test],
       # Docs
       name: "Pleroma",
       homepage_url: "https://pleroma.social/",
@@ -110,13 +110,13 @@ defmodule Pleroma.Mixfile do
       {:phoenix_html, "~> 2.10"},
       {:calendar, "~> 0.17.4"},
       {:cachex, "~> 3.0.2"},
-      {:httpoison, "~> 1.2.0"},
       {:poison, "~> 3.0", override: true},
-      {:tesla, "~> 1.2"},
+      {:tesla, "~> 1.3", override: true},
       {:jason, "~> 1.0"},
       {:mogrify, "~> 0.6.1"},
-      {:ex_aws, "~> 2.0"},
+      {:ex_aws, "~> 2.1"},
       {:ex_aws_s3, "~> 2.0"},
+      {:sweet_xml, "~> 0.6.6"},
       {:earmark, "~> 1.3"},
       {:bbcode, "~> 0.1.1"},
       {:ex_machina, "~> 2.3", only: :test},
@@ -125,9 +125,10 @@ defmodule Pleroma.Mixfile do
       {:crypt,
        git: "https://github.com/msantos/crypt", ref: "1f2b58927ab57e72910191a7ebaeff984382a1d3"},
       {:cors_plug, "~> 1.5"},
-      {:ex_doc, "~> 0.20.2", only: :dev, runtime: false},
+      {:ex_doc, "~> 0.21", only: :dev, runtime: false},
       {:web_push_encryption, "~> 0.2.1"},
-      {:swoosh, "~> 0.20"},
+      {:swoosh, "~> 0.23.2"},
+      {:phoenix_swoosh, "~> 0.2"},
       {:gen_smtp, "~> 0.13"},
       {:websocket_client, git: "https://github.com/jeremyong/websocket_client.git", only: :test},
       {:floki, "~> 0.20.0"},
@@ -139,20 +140,25 @@ defmodule Pleroma.Mixfile do
        ref: "95e8188490e97505c56636c1379ffdf036c1fdde"},
       {:http_signatures,
        git: "https://git.pleroma.social/pleroma/http_signatures.git",
-       ref: "9789401987096ead65646b52b5a2ca6bf52fc531"},
-      {:pleroma_job_queue, "~> 0.2.0"},
+       ref: "293d77bb6f4a67ac8bde1428735c3b42f22cbb30"},
+      {:pleroma_job_queue, "~> 0.3"},
       {:telemetry, "~> 0.3"},
+      {:poolboy, "~> 1.5"},
       {:prometheus_ex, "~> 3.0"},
       {:prometheus_plugs, "~> 1.1"},
-      {:prometheus_phoenix, "~> 1.2"},
+      {:prometheus_phoenix, "~> 1.3"},
       {:prometheus_ecto, "~> 1.4"},
       {:recon, github: "ferd/recon", tag: "2.4.0"},
       {:quack, "~> 0.1.1"},
+      {:joken, "~> 2.0"},
       {:benchee, "~> 1.0"},
       {:esshd, "~> 0.1.0", runtime: Application.get_env(:esshd, :enabled, false)},
       {:ex_rated, "~> 1.3"},
+      {:ex_const, "~> 0.2"},
       {:plug_static_index_html, "~> 1.0.0"},
-      {:excoveralls, "~> 0.11.1", only: :test}
+      {:excoveralls, "~> 0.11.1", only: :test},
+      {:flake_id, "~> 0.1.0"},
+      {:mox, "~> 0.5", only: :test}
     ] ++ oauth_deps()
   end
 
@@ -209,7 +215,10 @@ defmodule Pleroma.Mixfile do
       with {branch_name, 0} <- System.cmd("git", ["rev-parse", "--abbrev-ref", "HEAD"]),
            branch_name <- String.trim(branch_name),
            branch_name <- System.get_env("PLEROMA_BUILD_BRANCH") || branch_name,
-           true <- branch_name not in ["master", "HEAD"] do
+           true <-
+             !Enum.any?(["master", "HEAD", "release/", "stable"], fn name ->
+               String.starts_with?(name, branch_name)
+             end) do
         branch_name =
           branch_name
           |> String.trim()

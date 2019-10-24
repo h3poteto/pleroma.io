@@ -119,8 +119,10 @@ defmodule Pleroma.Web.Nodeinfo.NodeinfoController do
         },
         accountActivationRequired: Config.get([:instance, :account_activation_required], false),
         invitesEnabled: Config.get([:instance, :invites_enabled], false),
+        mailerEnabled: Config.get([Pleroma.Emails.Mailer, :enabled], false),
         features: features,
-        restrictedNicknames: Config.get([Pleroma.User, :restricted_nicknames])
+        restrictedNicknames: Config.get([Pleroma.User, :restricted_nicknames]),
+        skipThreadContainment: Config.get([:instance, :skip_thread_containment], false)
       }
     }
   end
@@ -158,8 +160,6 @@ defmodule Pleroma.Web.Nodeinfo.NodeinfoController do
   end
 
   def nodeinfo(conn, _) do
-    conn
-    |> put_status(404)
-    |> json(%{error: "Nodeinfo schema version not handled"})
+    render_error(conn, :not_found, "Nodeinfo schema version not handled")
   end
 end

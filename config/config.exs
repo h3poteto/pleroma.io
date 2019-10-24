@@ -252,7 +252,14 @@ config :pleroma, :instance,
   remote_post_retention_days: 90,
   skip_thread_containment: true,
   limit_to_local_content: :unauthenticated,
-  dynamic_configuration: false
+  dynamic_configuration: false,
+  user_bio_length: 5000,
+  user_name_length: 100,
+  max_account_fields: 10,
+  max_remote_account_fields: 20,
+  account_field_name_length: 512,
+  account_field_value_length: 512,
+  external_user_synchronization: true
 
 config :pleroma, :markup,
   # XXX - unfortunately, inline images must be enabled by default right now, because
@@ -303,7 +310,12 @@ config :pleroma, :assets,
 config :pleroma, :activitypub,
   unfollow_blocked: true,
   outgoing_blocks: true,
-  follow_handshake_timeout: 500
+  follow_handshake_timeout: 500,
+  sign_object_fetches: true
+
+config :pleroma, :streamer,
+  workers: 3,
+  overflow_workers: 2
 
 config :pleroma, :user, deny_follow_blocked: true
 
@@ -341,7 +353,13 @@ config :pleroma, :mrf_vocabulary,
 config :pleroma, :rich_media,
   enabled: true,
   ignore_hosts: [],
-  ignore_tld: ["local", "localdomain", "lan"]
+  ignore_tld: ["local", "localdomain", "lan"],
+  parsers: [
+    Pleroma.Web.RichMedia.Parsers.TwitterCard,
+    Pleroma.Web.RichMedia.Parsers.OGP,
+    Pleroma.Web.RichMedia.Parsers.OEmbed
+  ],
+  ttl_setters: [Pleroma.Web.RichMedia.Parser.TTL.AwsSignedUrl]
 
 config :pleroma, :media_proxy,
   enabled: false,
@@ -358,6 +376,8 @@ config :pleroma, :media_proxy,
 config :pleroma, :chat, enabled: true
 
 config :phoenix, :format_encoders, json: Jason
+
+config :phoenix, :json_library, Jason
 
 config :pleroma, :gopher,
   enabled: false,
@@ -442,6 +462,7 @@ config :pleroma, Pleroma.Web.Federator.RetryQueue,
   max_retries: 5
 
 config :pleroma_job_queue, :queues,
+  activity_expiration: 10,
   federator_incoming: 50,
   federator_outgoing: 50,
   web_push: 50,
@@ -500,7 +521,18 @@ config :ueberauth,
 
 config :pleroma, :auth, oauth_consumer_strategies: oauth_consumer_strategies
 
-config :pleroma, Pleroma.Emails.Mailer, adapter: Swoosh.Adapters.Sendmail
+config :pleroma, Pleroma.Emails.Mailer, adapter: Swoosh.Adapters.Sendmail, enabled: false
+
+config :pleroma, Pleroma.Emails.UserEmail,
+  logo: nil,
+  styling: %{
+    link_color: "#d8a070",
+    background_color: "#2C3645",
+    content_background_color: "#1B2635",
+    header_color: "#d8a070",
+    text_color: "#b9b9ba",
+    text_muted_color: "#b9b9ba"
+  }
 
 config :prometheus, Pleroma.Web.Endpoint.MetricsExporter, path: "/api/pleroma/app_metrics"
 
@@ -508,6 +540,14 @@ config :pleroma, Pleroma.ScheduledActivity,
   daily_user_limit: 25,
   total_user_limit: 300,
   enabled: true
+
+config :pleroma, :email_notifications,
+  digest: %{
+    active: false,
+    schedule: "0 0 * * 0",
+    interval: 7,
+    inactivity_threshold: 7
+  }
 
 config :pleroma, :oauth2,
   token_expires_in: 600,
@@ -522,9 +562,13 @@ config :pleroma, :env, Mix.env()
 config :http_signatures,
   adapter: Pleroma.Signature
 
-config :pleroma, :rate_limit,
-  search: [{1000, 10}, {1000, 30}],
-  app_account_creation: {1_800_000, 25}
+config :pleroma, :rate_limit, nil
+
+config :pleroma, Pleroma.ActivityExpiration, enabled: true
+
+config :pleroma, :web_cache_ttl,
+  activity_pub: nil,
+  activity_pub_question: 30_000
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.

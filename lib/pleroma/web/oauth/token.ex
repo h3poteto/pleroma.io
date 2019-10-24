@@ -21,7 +21,7 @@ defmodule Pleroma.Web.OAuth.Token do
     field(:refresh_token, :string)
     field(:scopes, {:array, :string}, default: [])
     field(:valid_until, :naive_datetime_usec)
-    belongs_to(:user, User, type: Pleroma.FlakeId)
+    belongs_to(:user, User, type: FlakeId.Ecto.CompatType)
     belongs_to(:app, App)
 
     timestamps()
@@ -44,8 +44,7 @@ defmodule Pleroma.Web.OAuth.Token do
     |> Repo.find_resource()
   end
 
-  @spec exchange_token(App.t(), Authorization.t()) ::
-          {:ok, Token.t()} | {:error, Changeset.t()}
+  @spec exchange_token(App.t(), Authorization.t()) :: {:ok, Token.t()} | {:error, Changeset.t()}
   def exchange_token(app, auth) do
     with {:ok, auth} <- Authorization.use_token(auth),
          true <- auth.app_id == app.id do

@@ -1,17 +1,21 @@
+# Pleroma: A lightweight social networking server
+# Copyright © 2017-2019 Pleroma Authors <https://pleroma.social/>
+# SPDX-License-Identifier: AGPL-3.0-only
+
 defmodule Pleroma.Web.ActivityPub.Visibility do
   alias Pleroma.Activity
   alias Pleroma.Object
   alias Pleroma.Repo
   alias Pleroma.User
 
+  require Pleroma.Constants
+
+  @spec is_public?(Object.t() | Activity.t() | map()) :: boolean()
   def is_public?(%Object{data: %{"type" => "Tombstone"}}), do: false
   def is_public?(%Object{data: data}), do: is_public?(data)
   def is_public?(%Activity{data: data}), do: is_public?(data)
   def is_public?(%{"directMessage" => true}), do: false
-
-  def is_public?(data) do
-    "https://www.w3.org/ns/activitystreams#Public" in (data["to"] ++ (data["cc"] || []))
-  end
+  def is_public?(data), do: Pleroma.Constants.as_public() in (data["to"] ++ (data["cc"] || []))
 
   def is_private?(activity) do
     with false <- is_public?(activity),
@@ -29,6 +33,20 @@ defmodule Pleroma.Web.ActivityPub.Visibility do
   def is_direct?(activity) do
     !is_public?(activity) && !is_private?(activity)
   end
+
+  def is_list?(%{data: %{"listMessage" => _}}), do: true
+  def is_list?(_), do: false
+
+  def visible_for_user?(%{actor: ap_id}, %User{ap_id: ap_id}), do: true
+
+  def visible_for_user?(%{data: %{"listMessage" => list_ap_id}} = activity, %User{} = user) do
+    user.ap_id in activity.data["to"] ||
+      list_ap_id
+      |> Pleroma.List.get_by_ap_id()
+      |> Pleroma.List.member?(user)
+  end
+
+  def visible_for_user?(%{data: %{"listMessage" => _}}, nil), do: false
 
   def visible_for_user?(activity, nil) do
     is_public?(activity)
@@ -51,15 +69,14 @@ defmodule Pleroma.Web.ActivityPub.Visibility do
   end
 
   def get_visibility(object) do
-    public = "https://www.w3.org/ns/activitystreams#Public"
     to = object.data["to"] || []
     cc = object.data["cc"] || []
 
     cond do
-      public in to ->
+      Pleroma.Constants.as_public() in to ->
         "public"
 
-      public in cc ->
+      Pleroma.Constants.as_public() in cc ->
         "unlisted"
 
       # this should use the sql for the object's activity
@@ -68,6 +85,9 @@ defmodule Pleroma.Web.ActivityPub.Visibility do
 
       object.data["directMessage"] == true ->
         "direct"
+
+      is_binary(object.data["listMessage"]) ->
+        "list"
 
       length(cc) > 0 ->
         "private"

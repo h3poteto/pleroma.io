@@ -15,6 +15,13 @@ defmodule Pleroma.ListTest do
     assert title == "title"
   end
 
+  test "validates title" do
+    user = insert(:user)
+
+    assert {:error, changeset} = Pleroma.List.create("", user)
+    assert changeset.errors == [title: {"can't be blank", [validation: :required]}]
+  end
+
   test "getting a list not belonging to the user" do
     user = insert(:user)
     other_user = insert(:user)
@@ -112,5 +119,31 @@ defmodule Pleroma.ListTest do
     lists_2 = Pleroma.List.get_lists_account_belongs(owner, member_2.id)
     assert owned_list in lists_2
     refute not_owned_list in lists_2
+  end
+
+  test "get by ap_id" do
+    user = insert(:user)
+    {:ok, list} = Pleroma.List.create("foo", user)
+    assert Pleroma.List.get_by_ap_id(list.ap_id) == list
+  end
+
+  test "memberships" do
+    user = insert(:user)
+    member = insert(:user)
+    {:ok, list} = Pleroma.List.create("foo", user)
+    {:ok, list} = Pleroma.List.follow(list, member)
+
+    assert Pleroma.List.memberships(member) == [list.ap_id]
+  end
+
+  test "member?" do
+    user = insert(:user)
+    member = insert(:user)
+
+    {:ok, list} = Pleroma.List.create("foo", user)
+    {:ok, list} = Pleroma.List.follow(list, member)
+
+    assert Pleroma.List.member?(list, member)
+    refute Pleroma.List.member?(list, user)
   end
 end

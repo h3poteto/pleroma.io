@@ -1,33 +1,12 @@
+# Pleroma: A lightweight social networking server
+# Copyright © 2017-2019 Pleroma Authors <https://pleroma.social/>
+# SPDX-License-Identifier: AGPL-3.0-only
+
 defmodule Pleroma.Web.RelMeTest do
   use ExUnit.Case, async: true
 
-  setup do
-    Tesla.Mock.mock(fn
-      %{
-        method: :get,
-        url: "http://example.com/rel_me/anchor"
-      } ->
-        %Tesla.Env{status: 200, body: File.read!("test/fixtures/rel_me_anchor.html")}
-
-      %{
-        method: :get,
-        url: "http://example.com/rel_me/anchor_nofollow"
-      } ->
-        %Tesla.Env{status: 200, body: File.read!("test/fixtures/rel_me_anchor_nofollow.html")}
-
-      %{
-        method: :get,
-        url: "http://example.com/rel_me/link"
-      } ->
-        %Tesla.Env{status: 200, body: File.read!("test/fixtures/rel_me_link.html")}
-
-      %{
-        method: :get,
-        url: "http://example.com/rel_me/null"
-      } ->
-        %Tesla.Env{status: 200, body: File.read!("test/fixtures/rel_me_null.html")}
-    end)
-
+  setup_all do
+    Tesla.Mock.mock_global(fn env -> apply(HttpRequestMock, :request, [env]) end)
     :ok
   end
 

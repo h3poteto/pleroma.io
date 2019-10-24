@@ -1,3 +1,7 @@
+# Pleroma: A lightweight social networking server
+# Copyright © 2017-2019 Pleroma Authors <https://pleroma.social/>
+# SPDX-License-Identifier: AGPL-3.0-only
+
 defmodule Pleroma.Web.RichMedia.HelpersTest do
   use Pleroma.DataCase
 
@@ -11,11 +15,11 @@ defmodule Pleroma.Web.RichMedia.HelpersTest do
 
   setup do
     mock(fn env -> apply(HttpRequestMock, :request, [env]) end)
-    rich_media = Config.get([:rich_media, :enabled])
-    on_exit(fn -> Config.put([:rich_media, :enabled], rich_media) end)
 
     :ok
   end
+
+  clear_config([:rich_media, :enabled])
 
   test "refuses to crawl incomplete URLs" do
     user = insert(:user)

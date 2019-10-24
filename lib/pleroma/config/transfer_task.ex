@@ -1,8 +1,12 @@
+# Pleroma: A lightweight social networking server
+# Copyright © 2017-2019 Pleroma Authors <https://pleroma.social/>
+# SPDX-License-Identifier: AGPL-3.0-only
+
 defmodule Pleroma.Config.TransferTask do
   use Task
   alias Pleroma.Web.AdminAPI.Config
 
-  def start_link do
+  def start_link(_) do
     load_and_update_env()
     if Pleroma.Config.get(:env) == :test, do: Ecto.Adapters.SQL.Sandbox.checkin(Pleroma.Repo)
     :ignore
@@ -31,7 +35,7 @@ defmodule Pleroma.Config.TransferTask do
         if String.starts_with?(setting.key, "Pleroma.") do
           "Elixir." <> setting.key
         else
-          setting.key
+          String.trim_leading(setting.key, ":")
         end
 
       group = String.to_existing_atom(setting.group)

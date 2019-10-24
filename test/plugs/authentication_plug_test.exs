@@ -8,6 +8,8 @@ defmodule Pleroma.Plugs.AuthenticationPlugTest do
   alias Pleroma.Plugs.AuthenticationPlug
   alias Pleroma.User
 
+  import ExUnit.CaptureLog
+
   setup %{conn: conn} do
     user = %User{
       id: 1,
@@ -53,5 +55,32 @@ defmodule Pleroma.Plugs.AuthenticationPlugTest do
       |> AuthenticationPlug.call(%{})
 
     assert conn == ret_conn
+  end
+
+  describe "checkpw/2" do
+    test "check pbkdf2 hash" do
+      hash =
+        "$pbkdf2-sha512$160000$loXqbp8GYls43F0i6lEfIw$AY.Ep.2pGe57j2hAPY635sI/6w7l9Q9u9Bp02PkPmF3OrClDtJAI8bCiivPr53OKMF7ph6iHhN68Rom5nEfC2A"
+
+      assert AuthenticationPlug.checkpw("test-password", hash)
+      refute AuthenticationPlug.checkpw("test-password1", hash)
+    end
+
+    @tag :skip_on_mac
+    test "check sha512-crypt hash" do
+      hash =
+        "$6$9psBWV8gxkGOZWBz$PmfCycChoxeJ3GgGzwvhlgacb9mUoZ.KUXNCssekER4SJ7bOK53uXrHNb2e4i8yPFgSKyzaW9CcmrDXWIEMtD1"
+
+      assert AuthenticationPlug.checkpw("password", hash)
+    end
+
+    test "it returns false when hash invalid" do
+      hash =
+        "psBWV8gxkGOZWBz$PmfCycChoxeJ3GgGzwvhlgacb9mUoZ.KUXNCssekER4SJ7bOK53uXrHNb2e4i8yPFgSKyzaW9CcmrDXWIEMtD1"
+
+      assert capture_log(fn ->
+               refute Pleroma.Plugs.AuthenticationPlug.checkpw("password", hash)
+             end) =~ "[error] Password hash not recognized"
+    end
   end
 end
