@@ -127,12 +127,12 @@ workflows:
           filters:
             branches:
               only:
-                - develop
+                - master
       - deploy:
           filters:
             branches:
               only:
-                - develop
+                - master
           requires:
             - build
             - image
