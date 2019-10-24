@@ -2,7 +2,7 @@ version: 2
 jobs:
   build:
     docker:
-      - image: h3poteto/phoenix:1.8.2
+      - image: h3poteto/elixir:1.8.2-slim-stretch
         environment:
           MIX_ENV: test
           DB_HOST: 127.0.0.1
@@ -29,7 +29,9 @@ jobs:
             - _build-{{ checksum "mix.exs" }}
       - run:
           name: Mix packages install
-          command: mix deps.get
+          command: |
+            mix local.hex --force
+            mix deps.get
       - save_cache:
           name: Saving cache - deps
           key: deps-{{ checksum "mix.exs" }}-{{ checksum "mix.lock" }}
@@ -38,7 +40,6 @@ jobs:
       - run:
           name: Compile deps packages
           command: |
-            mix local.hex --force
             mix local.rebar --force
             mix deps.compile
       - save_cache:
