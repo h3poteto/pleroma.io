@@ -54,7 +54,11 @@ jobs:
             mix ecto.migrate
       - run:
           name: test
-          command: mix test
+          # Now, test command runs unit test for postgres-rum.
+          # https://git.pleroma.social/pleroma/pleroma/blob/v1.1.5/.gitlab-ci.yml#L57
+          # But we want to run unit test for normal postgres.
+          command: |
+            mix coveralls --preload-modules
 
   image:
     machine: true
