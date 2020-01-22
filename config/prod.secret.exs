@@ -28,7 +28,7 @@ config :pleroma, Pleroma.Repo,
   password: System.get_env("DB_PASSWORD"),
   database: System.get_env("DB_NAME"),
   hostname: System.get_env("DB_HOST"),
-  pool_size: 30,
+  pool_size: 10,
   timeout: 60_000
 
 config :pleroma, Pleroma.Uploaders.S3,
