@@ -80,4 +80,8 @@ config :sentry,
   tags: %{
     env: "production"
   },
-  included_environments: [:prod]
+  included_environments: [:prod],
+  log_level: :error
+
+config :logger,
+  backends: [:console, Sentry.LoggerBackend]
