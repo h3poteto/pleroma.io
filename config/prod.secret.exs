@@ -69,6 +69,5 @@ config :web_push_encryption, :vapid_details,
 
 config :rollbax,
   access_token: System.get_env("ROLLBAR_ACCESS_TOKEN"),
-  environment: "production"
-
-config :rollbax, enable_crash_reports: true
+  environment: "production",
+  enable_crash_reports: true
