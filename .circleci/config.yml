@@ -9,6 +9,7 @@ jobs:
           DB_USER: pleroma
           DB_PASSWORD: pleroma
           DB_NAME: pleroma_test
+          ROLLBAR_ACCESS_TOKEN: dummy
       - image: postgres:11.2-alpine
         environment:
           POSTGRES_USER: pleroma

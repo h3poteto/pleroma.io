@@ -5,6 +5,7 @@ services:
     working_dir: /var/opt/app
     environment:
       MIX_ENV: dev
+      ROLLBAR_ACCESS_TOKEN: dummy
     volumes:
       - .:/var/opt/app
     ports:
