@@ -70,7 +70,8 @@ config :web_push_encryption, :vapid_details,
 config :rollbax,
   access_token: System.get_env("ROLLBAR_ACCESS_TOKEN"),
   environment: "production",
-  enable_crash_reports: true
+  enable_crash_reports: true,
+  enabled: true
 
 config :sentry,
   dsn: System.get_env("SENTRY_DNS"),
@@ -80,8 +81,7 @@ config :sentry,
   tags: %{
     env: "production"
   },
-  included_environments: [:prod],
-  enabled: true
+  included_environments: [:prod]
 
 config :logger,
   backends: [:console, Sentry.LoggerBackend]
