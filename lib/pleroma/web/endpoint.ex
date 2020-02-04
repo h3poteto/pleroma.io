@@ -4,7 +4,6 @@
 
 defmodule Pleroma.Web.Endpoint do
   use Phoenix.Endpoint, otp_app: :pleroma
-  use Sentry.Phoenix.Endpoint
 
   socket("/socket", Pleroma.Web.UserSocket)
 
