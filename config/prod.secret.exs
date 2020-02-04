@@ -81,7 +81,7 @@ config :sentry,
     env: "production"
   },
   included_environments: [:prod],
-  log_level: :error
+  enabled: true
 
 config :logger,
   backends: [:console, Sentry.LoggerBackend]

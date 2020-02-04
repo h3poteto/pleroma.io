@@ -21,7 +21,6 @@ config :pleroma, Pleroma.Repo,
   hostname: "db",
   pool_size: 10
 
-
 config :pleroma, :instance,
   name: "Pleroma.io",
   email: "h3.poteto@gmail.com",
@@ -29,8 +28,6 @@ config :pleroma, :instance,
   registrations_open: true,
   dynamic_configuration: false
 
-config :pleroma, :chat,
-  enabled: false
+config :pleroma, :chat, enabled: false
 
-config :pleroma, :fe,
-  scope_options_enabled: true
+config :pleroma, :fe, scope_options_enabled: true
