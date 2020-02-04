@@ -570,8 +570,7 @@ config :pleroma, :web_cache_ttl,
   activity_pub: nil,
   activity_pub_question: 30_000
 
-config :rollbax,
-  access_token: System.get_env("ROLLBAR_ACCESS_TOKEN")
+config :rollbax, enabled: false
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
