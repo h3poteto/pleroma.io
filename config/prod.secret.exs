@@ -67,12 +67,6 @@ config :web_push_encryption, :vapid_details,
   public_key: System.get_env("WEB_PUSH_PUBLIC_KEY"),
   private_key: System.get_env("WEB_PUSH_PRIVATE_KEY")
 
-config :rollbax,
-  access_token: System.get_env("ROLLBAR_ACCESS_TOKEN"),
-  environment: "production",
-  enable_crash_reports: true,
-  enabled: true
-
 config :logger,
   backends: [:console, Sentry.LoggerBackend]
 
