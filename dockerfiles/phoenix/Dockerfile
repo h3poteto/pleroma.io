@@ -1,4 +1,4 @@
-FROM h3poteto/elixir:1.8.2-slim-stretch
+FROM h3poteto/elixir:1.9.1-slim-stretch
 
 USER root
 ENV APP_DIR /var/opt/app

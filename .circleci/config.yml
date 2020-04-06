@@ -2,7 +2,7 @@ version: 2
 jobs:
   build:
     docker:
-      - image: h3poteto/elixir:1.8.2-slim-stretch
+      - image: h3poteto/elixir:1.9.1-slim-stretch
         environment:
           MIX_ENV: test
           DB_HOST: 127.0.0.1
@@ -91,7 +91,7 @@ jobs:
     docker:
       - image: h3poteto/kubectl:latest
         environment:
-          CLUSTER_NAME: external-prd.k8s.h3poteto.dev
+          CLUSTER_NAME: external-prd-20200329.k8s.h3poteto.dev
     working_directory: /var/opt/kube
     steps:
       - run:
@@ -101,8 +101,8 @@ jobs:
       - run:
           name: install kube-job
           command: |
-            wget https://github.com/h3poteto/kube-job/releases/download/v0.2.2/kube-job_0.2.2_linux_amd64.zip
-            unzip kube-job_0.2.2_linux_amd64.zip
+            wget https://github.com/h3poteto/kube-job/releases/download/v0.3.2/kube-job_0.3.2_linux_amd64.zip
+            unzip kube-job_0.3.2_linux_amd64.zip
             ./kube-job version
       - run:
           name: Clone k8s services
