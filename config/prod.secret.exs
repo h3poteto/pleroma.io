@@ -43,9 +43,7 @@ config :ex_aws, :s3,
   region: "ap-northeast-1",
   scheme: "https://"
 
-config :pleroma, Pleroma.Upload,
-  uploader: Pleroma.Uploaders.S3,
-  strip_exif: false
+config :pleroma, Pleroma.Upload, uploader: Pleroma.Uploaders.S3
 
 config :pleroma, :chat, enabled: false
 
