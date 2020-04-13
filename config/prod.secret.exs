@@ -38,11 +38,8 @@ config :pleroma, Pleroma.Uploaders.S3,
   public_endpoint: "https://"
 
 config :ex_aws,
-  awscli_auth_adapter: ExAws.STS.AuthCache.AssumeRoleWebIdentityAdapter
-
-config :ex_aws, :s3,
   region: "ap-northeast-1",
-  scheme: "https://"
+  awscli_auth_adapter: ExAws.STS.AuthCache.AssumeRoleWebIdentityAdapter
 
 config :pleroma, Pleroma.Upload, uploader: Pleroma.Uploaders.S3
 
