@@ -38,8 +38,15 @@ config :pleroma, Pleroma.Uploaders.S3,
   public_endpoint: "https://"
 
 config :ex_aws,
-  region: "ap-northeast-1",
+  # We have to set dummy profile to use web identity adapter.
+  # So this profile does not exist and don't prepare it.
+  secret_access_key: [{:awscli, "profile_name", 30}],
+  access_key_id: [{:awscli, "profile_name", 30}],
   awscli_auth_adapter: ExAws.STS.AuthCache.AssumeRoleWebIdentityAdapter
+
+config :ex_aws, :s3,
+  region: "ap-northeast-1",
+  scheme: "https://"
 
 config :pleroma, Pleroma.Upload, uploader: Pleroma.Uploaders.S3
 
