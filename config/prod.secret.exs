@@ -37,9 +37,10 @@ config :pleroma, Pleroma.Uploaders.S3,
   # So if we set public endpoint, the URL is `https://media.pleroma.io/media.pleroma.io/filename.png`.
   public_endpoint: "https://"
 
+config :ex_aws,
+  awscli_auth_adapter: ExAws.STS.AuthCache.AssumeRoleWebIdentityAdapter
+
 config :ex_aws, :s3,
-  access_key_id: [{:system, "AWS_ACCESS_KEY_ID"}, :instance_role],
-  secret_access_key: [{:system, "AWS_SECRET_ACCESS_KEY"}, :instance_role],
   region: "ap-northeast-1",
   scheme: "https://"
 

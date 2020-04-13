@@ -124,6 +124,7 @@ defmodule Pleroma.Mixfile do
       {:mogrify, "~> 0.6.1"},
       {:ex_aws, "~> 2.1"},
       {:ex_aws_s3, "~> 2.0"},
+      {:ex_aws_sts, "~>2.1"},
       {:sweet_xml, "~> 0.6.6"},
       {:earmark, "~> 1.3"},
       {:bbcode, "~> 0.1.1"},
