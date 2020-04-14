@@ -2,7 +2,7 @@ version: 2
 jobs:
   build:
     docker:
-      - image: h3poteto/elixir:1.9.1-slim-stretch
+      - image: h3poteto/elixir:1.10.2-slim-buster
         environment:
           MIX_ENV: test
           DB_HOST: 127.0.0.1

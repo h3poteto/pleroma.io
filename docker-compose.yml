@@ -1,7 +1,7 @@
 version: "3.0"
 services:
   elixir:
-    image: h3poteto/elixir:1.9.1-slim-stretch
+    image: h3poteto/elixir:1.10.2-slim-buster
     working_dir: /var/opt/app
     environment:
       MIX_ENV: dev
