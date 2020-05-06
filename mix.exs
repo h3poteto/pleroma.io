@@ -4,7 +4,7 @@ defmodule Pleroma.Mixfile do
   def project do
     [
       app: :pleroma,
-      version: version("2.0.0"),
+      version: version("2.0.1"),
       elixir: "~> 1.8",
       elixirc_paths: elixirc_paths(Mix.env()),
       compilers: [:phoenix, :gettext] ++ Mix.compilers(),
@@ -129,7 +129,7 @@ defmodule Pleroma.Mixfile do
       {:sweet_xml, "~> 0.6.6"},
       {:configparser_ex, "~> 4.0"},
       {:earmark, "~> 1.3"},
-      {:bbcode, "~> 0.1.1"},
+      {:bbcode_pleroma, "~> 0.2.0"},
       {:ex_machina, "~> 2.3", only: :test},
       {:credo, "~> 1.1.0", only: [:dev, :test], runtime: false},
       {:mock, "~> 0.3.3", only: :test},
