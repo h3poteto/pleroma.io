@@ -20,6 +20,7 @@ config :pleroma, :instance,
   notify_email: "h3.poteto@gmail.com",
   limit: 5000,
   registrations_open: false,
+  invites_enabled: true,
   dynamic_configuration: false
 
 config :pleroma, Pleroma.Repo,
@@ -54,7 +55,8 @@ config :pleroma, :chat, enabled: false
 
 config :pleroma, :frontend_configurations,
   pleroma_fe: %{
-    scope_options_enabled: true
+    showInstanceSpecificPanel: true,
+    scopeOptionsEnabled: false
   }
 
 config :pleroma, :suggestions,
