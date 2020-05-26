@@ -2291,7 +2291,7 @@ defmodule Pleroma.Web.AdminAPI.AdminAPIControllerTest do
         |> get("/api/pleroma/admin/config")
         |> json_response(200)
 
-      refute Map.has_key?(configs, "need_reboot")
+      assert configs["need_reboot"] == false
     end
 
     test "update setting which need reboot, don't change reboot flag until reboot", %{conn: conn} do
@@ -2347,7 +2347,7 @@ defmodule Pleroma.Web.AdminAPI.AdminAPIControllerTest do
         |> get("/api/pleroma/admin/config")
         |> json_response(200)
 
-      refute Map.has_key?(configs, "need_reboot")
+      assert configs["need_reboot"] == false
     end
 
     test "saving config with nested merge", %{conn: conn} do
@@ -3065,6 +3065,20 @@ defmodule Pleroma.Web.AdminAPI.AdminAPIControllerTest do
     end
   end
 
+  test "need_reboot flag", %{conn: conn} do
+    assert conn
+           |> get("/api/pleroma/admin/need_reboot")
+           |> json_response(200) == %{"need_reboot" => false}
+
+    Restarter.Pleroma.need_reboot()
+
+    assert conn
+           |> get("/api/pleroma/admin/need_reboot")
+           |> json_response(200) == %{"need_reboot" => true}
+
+    on_exit(fn -> Restarter.Pleroma.refresh() end)
+  end
+
   describe "GET /api/pleroma/admin/statuses" do
     test "returns all public, unlisted, and direct statuses", %{conn: conn, admin: admin} do
       blocked = insert(:user)
@@ -3382,6 +3396,75 @@ defmodule Pleroma.Web.AdminAPI.AdminAPIControllerTest do
 
       assert get_in(first_entry, ["data", "message"]) ==
                "@#{moderator.nickname} unfollowed relay: https://example.org/relay"
+    end
+  end
+
+  describe "GET /users/:nickname/credentials" do
+    test "gets the user credentials", %{conn: conn} do
+      user = insert(:user)
+      conn = get(conn, "/api/pleroma/admin/users/#{user.nickname}/credentials")
+
+      response = assert json_response(conn, 200)
+      assert response["email"] == user.email
+    end
+
+    test "returns 403 if requested by a non-admin" do
+      user = insert(:user)
+
+      conn =
+        build_conn()
+        |> assign(:user, user)
+        |> get("/api/pleroma/admin/users/#{user.nickname}/credentials")
+
+      assert json_response(conn, :forbidden)
+    end
+  end
+
+  describe "PATCH /users/:nickname/credentials" do
+    test "changes password and email", %{conn: conn, admin: admin} do
+      user = insert(:user)
+      assert user.password_reset_pending == false
+
+      conn =
+        patch(conn, "/api/pleroma/admin/users/#{user.nickname}/credentials", %{
+          "password" => "new_password",
+          "email" => "new_email@example.com",
+          "name" => "new_name"
+        })
+
+      assert json_response(conn, 200) == %{"status" => "success"}
+
+      ObanHelpers.perform_all()
+
+      updated_user = User.get_by_id(user.id)
+
+      assert updated_user.email == "new_email@example.com"
+      assert updated_user.name == "new_name"
+      assert updated_user.password_hash != user.password_hash
+      assert updated_user.password_reset_pending == true
+
+      [log_entry2, log_entry1] = ModerationLog |> Repo.all() |> Enum.sort()
+
+      assert ModerationLog.get_log_entry_message(log_entry1) ==
+               "@#{admin.nickname} updated users: @#{user.nickname}"
+
+      assert ModerationLog.get_log_entry_message(log_entry2) ==
+               "@#{admin.nickname} forced password reset for users: @#{user.nickname}"
+    end
+
+    test "returns 403 if requested by a non-admin" do
+      user = insert(:user)
+
+      conn =
+        build_conn()
+        |> assign(:user, user)
+        |> patch("/api/pleroma/admin/users/#{user.nickname}/credentials", %{
+          "password" => "new_password",
+          "email" => "new_email@example.com",
+          "name" => "new_name"
+        })
+
+      assert json_response(conn, :forbidden)
     end
   end
 
