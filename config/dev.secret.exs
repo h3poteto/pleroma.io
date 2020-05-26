@@ -25,9 +25,14 @@ config :pleroma, :instance,
   name: "Pleroma.io",
   email: "h3.poteto@gmail.com",
   limit: 5000,
-  registrations_open: true,
+  registrations_open: false,
+  invites_enabled: true,
   dynamic_configuration: false
 
 config :pleroma, :chat, enabled: false
 
-config :pleroma, :fe, scope_options_enabled: true
+config :pleroma, :frontend_configurations,
+  pleroma_fe: %{
+    showInstanceSpecificPanel: true,
+    scopeOptionsEnabled: false
+  }
