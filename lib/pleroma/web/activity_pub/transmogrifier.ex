@@ -229,7 +229,8 @@ defmodule Pleroma.Web.ActivityPub.Transmogrifier do
     Map.put(object, "url", url["href"])
   end
 
-  def fix_url(%{"type" => "Video", "url" => url} = object) when is_list(url) do
+  def fix_url(%{"type" => object_type, "url" => url} = object)
+      when object_type in ["Video", "Audio"] and is_list(url) do
     first_element = Enum.at(url, 0)
 
     link_element = Enum.find(url, fn x -> is_map(x) and x["mimeType"] == "text/html" end)
@@ -398,7 +399,7 @@ defmodule Pleroma.Web.ActivityPub.Transmogrifier do
         %{"type" => "Create", "object" => %{"type" => objtype} = object} = data,
         options
       )
-      when objtype in ["Article", "Event", "Note", "Video", "Page", "Question", "Answer"] do
+      when objtype in ["Article", "Event", "Note", "Video", "Page", "Question", "Answer", "Audio"] do
     actor = Containment.get_actor(data)
 
     data =
@@ -490,7 +491,8 @@ defmodule Pleroma.Web.ActivityPub.Transmogrifier do
            {_, {:ok, follower}} <- {:follow, User.follow(follower, followed)},
            {_, {:ok, _}} <-
              {:follow_state_update, Utils.update_follow_state_for_all(activity, "accept")},
-           {:ok, _relationship} <- FollowingRelationship.update(follower, followed, "accept") do
+           {:ok, _relationship} <-
+             FollowingRelationship.update(follower, followed, :follow_accept) do
         ActivityPub.accept(%{
           to: [follower.ap_id],
           actor: followed,
@@ -500,7 +502,7 @@ defmodule Pleroma.Web.ActivityPub.Transmogrifier do
       else
         {:user_blocked, true} ->
           {:ok, _} = Utils.update_follow_state_for_all(activity, "reject")
-          {:ok, _relationship} = FollowingRelationship.update(follower, followed, "reject")
+          {:ok, _relationship} = FollowingRelationship.update(follower, followed, :follow_reject)
 
           ActivityPub.reject(%{
             to: [follower.ap_id],
@@ -511,7 +513,7 @@ defmodule Pleroma.Web.ActivityPub.Transmogrifier do
 
         {:follow, {:error, _}} ->
           {:ok, _} = Utils.update_follow_state_for_all(activity, "reject")
-          {:ok, _relationship} = FollowingRelationship.update(follower, followed, "reject")
+          {:ok, _relationship} = FollowingRelationship.update(follower, followed, :follow_reject)
 
           ActivityPub.reject(%{
             to: [follower.ap_id],
@@ -521,7 +523,7 @@ defmodule Pleroma.Web.ActivityPub.Transmogrifier do
           })
 
         {:user_locked, true} ->
-          {:ok, _relationship} = FollowingRelationship.update(follower, followed, "pending")
+          {:ok, _relationship} = FollowingRelationship.update(follower, followed, :follow_pending)
           :noop
       end
 
@@ -541,7 +543,7 @@ defmodule Pleroma.Web.ActivityPub.Transmogrifier do
          {:ok, follow_activity} <- get_follow_activity(follow_object, followed),
          {:ok, follow_activity} <- Utils.update_follow_state_for_all(follow_activity, "accept"),
          %User{local: true} = follower <- User.get_cached_by_ap_id(follow_activity.data["actor"]),
-         {:ok, _relationship} <- FollowingRelationship.update(follower, followed, "accept") do
+         {:ok, _relationship} <- FollowingRelationship.update(follower, followed, :follow_accept) do
       ActivityPub.accept(%{
         to: follow_activity.data["to"],
         type: "Accept",
@@ -564,7 +566,7 @@ defmodule Pleroma.Web.ActivityPub.Transmogrifier do
          {:ok, follow_activity} <- get_follow_activity(follow_object, followed),
          {:ok, follow_activity} <- Utils.update_follow_state_for_all(follow_activity, "reject"),
          %User{local: true} = follower <- User.get_cached_by_ap_id(follow_activity.data["actor"]),
-         {:ok, _relationship} <- FollowingRelationship.update(follower, followed, "reject"),
+         {:ok, _relationship} <- FollowingRelationship.update(follower, followed, :follow_reject),
          {:ok, activity} <-
            ActivityPub.reject(%{
              to: follow_activity.data["to"],
@@ -1108,13 +1110,11 @@ defmodule Pleroma.Web.ActivityPub.Transmogrifier do
   end
 
   def add_mention_tags(object) do
-    mentions =
-      object
-      |> Utils.get_notified_from_object()
-      |> Enum.map(&build_mention_tag/1)
+    {enabled_receivers, disabled_receivers} = Utils.get_notified_from_object(object)
+    potential_receivers = enabled_receivers ++ disabled_receivers
+    mentions = Enum.map(potential_receivers, &build_mention_tag/1)
 
     tags = object["tag"] || []
-
     Map.put(object, "tag", tags ++ mentions)
   end
 
