@@ -560,6 +560,7 @@ defmodule Pleroma.UserTest do
       assert user == fetched_user
     end
 
+    @tag capture_log: true
     test "returns nil if no user could be fetched" do
       {:error, fetched_user} = User.get_or_fetch_by_nickname("nonexistant@social.heldscal.la")
       assert fetched_user == "not found nonexistant@social.heldscal.la"
@@ -570,7 +571,10 @@ defmodule Pleroma.UserTest do
       assert fetched_user == "not found nonexistant"
     end
 
+    clear_config([:instance, :user_bio_length])
+
     test "updates an existing user, if stale" do
+      Pleroma.Config.put([:instance, :user_bio_length], 1)
       a_week_ago = NaiveDateTime.add(NaiveDateTime.utc_now(), -604_800)
 
       orig_user =

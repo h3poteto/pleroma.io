@@ -4,7 +4,7 @@ defmodule Pleroma.Mixfile do
   def project do
     [
       app: :pleroma,
-      version: version("2.0.3"),
+      version: version("2.0.6"),
       elixir: "~> 1.8",
       elixirc_paths: elixirc_paths(Mix.env()),
       compilers: [:phoenix, :gettext] ++ Mix.compilers(),
@@ -36,7 +36,7 @@ defmodule Pleroma.Mixfile do
       releases: [
         pleroma: [
           include_executables_for: [:unix],
-          applications: [ex_syslogger: :load, syslog: :load],
+          applications: [ex_syslogger: :load, syslog: :load, eldap: :transient],
           steps: [:assemble, &copy_files/1, &copy_nginx_config/1]
         ]
       ]
@@ -63,7 +63,14 @@ defmodule Pleroma.Mixfile do
   def application do
     [
       mod: {Pleroma.Application, []},
-      extra_applications: [:logger, :runtime_tools, :comeonin, :quack, :fast_sanitize, :ssl],
+      extra_applications: [
+        :logger,
+        :runtime_tools,
+        :comeonin,
+        :quack,
+        :fast_sanitize,
+        :ssl
+      ],
       included_applications: [:ex_syslogger]
     ]
   end
@@ -134,7 +141,7 @@ defmodule Pleroma.Mixfile do
       {:credo, "~> 1.1.0", only: [:dev, :test], runtime: false},
       {:mock, "~> 0.3.3", only: :test},
       {:crypt,
-       git: "https://github.com/msantos/crypt", ref: "1f2b58927ab57e72910191a7ebaeff984382a1d3"},
+       git: "https://github.com/msantos/crypt", ref: "f63a705f92c26955977ee62a313012e309a4d77a"},
       {:cors_plug, "~> 1.5"},
       {:ex_doc, "~> 0.21", only: :dev, runtime: false},
       {:web_push_encryption, "~> 0.2.1"},

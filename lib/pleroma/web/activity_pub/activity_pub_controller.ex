@@ -18,6 +18,7 @@ defmodule Pleroma.Web.ActivityPub.ActivityPubController do
   alias Pleroma.Web.ActivityPub.UserView
   alias Pleroma.Web.ActivityPub.Utils
   alias Pleroma.Web.ActivityPub.Visibility
+  alias Pleroma.Web.ControllerHelper
   alias Pleroma.Web.Federator
 
   require Logger
@@ -200,31 +201,29 @@ defmodule Pleroma.Web.ActivityPub.ActivityPubController do
     end
   end
 
-  def outbox(conn, %{"nickname" => nickname, "page" => page?} = params)
+  def outbox(
+        %{assigns: %{user: for_user}} = conn,
+        %{"nickname" => nickname, "page" => page?} = params
+      )
       when page? in [true, "true"] do
     with %User{} = user <- User.get_cached_by_nickname(nickname),
          {:ok, user} <- User.ensure_keys_present(user) do
-      activities =
-        if params["max_id"] do
-          ActivityPub.fetch_user_activities(user, nil, %{
-            "max_id" => params["max_id"],
-            # This is a hack because postgres generates inefficient queries when filtering by
-            # 'Answer', poll votes will be hidden by the visibility filter in this case anyway
-            "include_poll_votes" => true,
-            "limit" => 10
-          })
-        else
-          ActivityPub.fetch_user_activities(user, nil, %{
-            "limit" => 10,
-            "include_poll_votes" => true
-          })
-        end
+      # "include_poll_votes" is a hack because postgres generates inefficient
+      # queries when filtering by 'Answer', poll votes will be hidden by the
+      # visibility filter in this case anyway
+      params =
+        params
+        |> Map.drop(["nickname", "page"])
+        |> Map.put("include_poll_votes", true)
+
+      activities = ActivityPub.fetch_user_activities(user, for_user, params)
 
       conn
       |> put_resp_content_type("application/activity+json")
       |> put_view(UserView)
       |> render("activity_collection_page.json", %{
         activities: activities,
+        pagination: ControllerHelper.get_pagination_fields(conn, activities),
         iri: "#{user.ap_id}/outbox"
       })
     end
@@ -318,21 +317,23 @@ defmodule Pleroma.Web.ActivityPub.ActivityPubController do
         %{"nickname" => nickname, "page" => page?} = params
       )
       when page? in [true, "true"] do
+    params =
+      params
+      |> Map.drop(["nickname", "page"])
+      |> Map.put("blocking_user", user)
+      |> Map.put("user", user)
+
     activities =
-      if params["max_id"] do
-        ActivityPub.fetch_activities([user.ap_id | User.following(user)], %{
-          "max_id" => params["max_id"],
-          "limit" => 10
-        })
-      else
-        ActivityPub.fetch_activities([user.ap_id | User.following(user)], %{"limit" => 10})
-      end
+      [user.ap_id | User.following(user)]
+      |> ActivityPub.fetch_activities(params)
+      |> Enum.reverse()
 
     conn
     |> put_resp_content_type("application/activity+json")
     |> put_view(UserView)
     |> render("activity_collection_page.json", %{
       activities: activities,
+      pagination: ControllerHelper.get_pagination_fields(conn, activities),
       iri: "#{user.ap_id}/inbox"
     })
   end
@@ -370,7 +371,10 @@ defmodule Pleroma.Web.ActivityPub.ActivityPubController do
     |> json(err)
   end
 
-  def handle_user_activity(user, %{"type" => "Create"} = params) do
+  defp handle_user_activity(
+         %User{} = user,
+         %{"type" => "Create", "object" => %{"type" => "Note"}} = params
+       ) do
     object =
       params["object"]
       |> Map.merge(Map.take(params, ["to", "cc"]))
@@ -386,7 +390,7 @@ defmodule Pleroma.Web.ActivityPub.ActivityPubController do
     })
   end
 
-  def handle_user_activity(user, %{"type" => "Delete"} = params) do
+  defp handle_user_activity(user, %{"type" => "Delete"} = params) do
     with %Object{} = object <- Object.normalize(params["object"]),
          true <- user.is_moderator || user.ap_id == object.data["actor"],
          {:ok, delete} <- ActivityPub.delete(object) do
@@ -396,7 +400,7 @@ defmodule Pleroma.Web.ActivityPub.ActivityPubController do
     end
   end
 
-  def handle_user_activity(user, %{"type" => "Like"} = params) do
+  defp handle_user_activity(user, %{"type" => "Like"} = params) do
     with %Object{} = object <- Object.normalize(params["object"]),
          {:ok, activity, _object} <- ActivityPub.like(user, object) do
       {:ok, activity}
@@ -405,7 +409,7 @@ defmodule Pleroma.Web.ActivityPub.ActivityPubController do
     end
   end
 
-  def handle_user_activity(_, _) do
+  defp handle_user_activity(_, _) do
     {:error, dgettext("errors", "Unhandled activity type")}
   end
 
