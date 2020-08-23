@@ -310,7 +310,11 @@ defmodule Pleroma.Web.ActivityPub.ActivityPubControllerTest do
   end
 
   describe "/inbox" do
+    clear_config([:instance, :user_bio_length])
+
     test "it inserts an incoming activity into the database", %{conn: conn} do
+      Pleroma.Config.put([:instance, :user_bio_length], 1)
+
       data = File.read!("test/fixtures/mastodon-post-activity.json") |> Poison.decode!()
 
       conn =
@@ -615,17 +619,63 @@ defmodule Pleroma.Web.ActivityPub.ActivityPubControllerTest do
     end
   end
 
-  describe "/users/:nickname/outbox" do
-    test "it will not bomb when there is no activity", %{conn: conn} do
+  describe "GET /users/:nickname/outbox" do
+    test "it paginates correctly", %{conn: conn} do
       user = insert(:user)
+      conn = assign(conn, :user, user)
+      outbox_endpoint = user.ap_id <> "/outbox"
+
+      _posts =
+        for i <- 0..25 do
+          {:ok, activity} = CommonAPI.post(user, %{"status" => "post #{i}"})
+          activity
+        end
+
+      result =
+        conn
+        |> put_req_header("accept", "application/activity+json")
+        |> get(outbox_endpoint <> "?page=true")
+        |> json_response(200)
+
+      result_ids = Enum.map(result["orderedItems"], fn x -> x["id"] end)
+      assert length(result["orderedItems"]) == 20
+      assert length(result_ids) == 20
+      assert result["next"]
+      assert String.starts_with?(result["next"], outbox_endpoint)
+
+      result_next =
+        conn
+        |> put_req_header("accept", "application/activity+json")
+        |> get(result["next"])
+        |> json_response(200)
+
+      result_next_ids = Enum.map(result_next["orderedItems"], fn x -> x["id"] end)
+      assert length(result_next["orderedItems"]) == 6
+      assert length(result_next_ids) == 6
+      refute Enum.find(result_next_ids, fn x -> x in result_ids end)
+      refute Enum.find(result_ids, fn x -> x in result_next_ids end)
+      assert String.starts_with?(result["id"], outbox_endpoint)
+
+      result_next_again =
+        conn
+        |> put_req_header("accept", "application/activity+json")
+        |> get(result_next["id"])
+        |> json_response(200)
+
+      assert result_next == result_next_again
+    end
+
+    test "it returns 200 even if there're no activities", %{conn: conn} do
+      user = insert(:user)
+      outbox_endpoint = user.ap_id <> "/outbox"
 
       conn =
         conn
         |> put_req_header("accept", "application/activity+json")
-        |> get("/users/#{user.nickname}/outbox")
+        |> get(outbox_endpoint)
 
       result = json_response(conn, 200)
-      assert user.ap_id <> "/outbox" == result["id"]
+      assert outbox_endpoint == result["id"]
     end
 
     test "it returns a note activity in a collection", %{conn: conn} do
@@ -652,9 +702,25 @@ defmodule Pleroma.Web.ActivityPub.ActivityPubControllerTest do
 
       assert response(conn, 200) =~ announce_activity.data["object"]
     end
+  end
 
-    test "it rejects posts from other users", %{conn: conn} do
-      data = File.read!("test/fixtures/activitypub-client-post-activity.json") |> Poison.decode!()
+  describe "POST /users/:nickname/outbox (C2S)" do
+    setup do
+      [
+        activity: %{
+          "@context" => "https://www.w3.org/ns/activitystreams",
+          "type" => "Create",
+          "object" => %{"type" => "Note", "content" => "AP C2S test"},
+          "to" => "https://www.w3.org/ns/activitystreams#Public",
+          "cc" => []
+        }
+      ]
+    end
+
+    test "it rejects posts from other users / unauthenticated users", %{
+      conn: conn,
+      activity: activity
+    } do
       user = insert(:user)
       otheruser = insert(:user)
 
@@ -662,39 +728,76 @@ defmodule Pleroma.Web.ActivityPub.ActivityPubControllerTest do
         conn
         |> assign(:user, otheruser)
         |> put_req_header("content-type", "application/activity+json")
-        |> post("/users/#{user.nickname}/outbox", data)
+        |> post("/users/#{user.nickname}/outbox", activity)
 
       assert json_response(conn, 403)
     end
 
-    test "it inserts an incoming create activity into the database", %{conn: conn} do
-      data = File.read!("test/fixtures/activitypub-client-post-activity.json") |> Poison.decode!()
+    test "it inserts an incoming create activity into the database", %{
+      conn: conn,
+      activity: activity
+    } do
       user = insert(:user)
 
-      conn =
+      result =
         conn
         |> assign(:user, user)
         |> put_req_header("content-type", "application/activity+json")
-        |> post("/users/#{user.nickname}/outbox", data)
-
-      result = json_response(conn, 201)
+        |> post("/users/#{user.nickname}/outbox", activity)
+        |> json_response(201)
 
       assert Activity.get_by_ap_id(result["id"])
+      assert result["object"]
+      assert %Object{data: object} = Object.normalize(result["object"])
+      assert object["content"] == activity["object"]["content"]
     end
 
-    test "it rejects an incoming activity with bogus type", %{conn: conn} do
-      data = File.read!("test/fixtures/activitypub-client-post-activity.json") |> Poison.decode!()
+    test "it rejects anything beyond 'Note' creations", %{conn: conn, activity: activity} do
       user = insert(:user)
 
-      data =
-        data
-        |> Map.put("type", "BadType")
+      activity =
+        activity
+        |> put_in(["object", "type"], "Benis")
+
+      _result =
+        conn
+        |> assign(:user, user)
+        |> put_req_header("content-type", "application/activity+json")
+        |> post("/users/#{user.nickname}/outbox", activity)
+        |> json_response(400)
+    end
+
+    test "it inserts an incoming sensitive activity into the database", %{
+      conn: conn,
+      activity: activity
+    } do
+      user = insert(:user)
+      object = Map.put(activity["object"], "sensitive", true)
+      activity = Map.put(activity, "object", object)
+
+      result =
+        conn
+        |> assign(:user, user)
+        |> put_req_header("content-type", "application/activity+json")
+        |> post("/users/#{user.nickname}/outbox", activity)
+        |> json_response(201)
+
+      assert Activity.get_by_ap_id(result["id"])
+      assert result["object"]
+      assert %Object{data: object} = Object.normalize(result["object"])
+      assert object["sensitive"] == activity["object"]["sensitive"]
+      assert object["content"] == activity["object"]["content"]
+    end
+
+    test "it rejects an incoming activity with bogus type", %{conn: conn, activity: activity} do
+      user = insert(:user)
+      activity = Map.put(activity, "type", "BadType")
 
       conn =
         conn
         |> assign(:user, user)
         |> put_req_header("content-type", "application/activity+json")
-        |> post("/users/#{user.nickname}/outbox", data)
+        |> post("/users/#{user.nickname}/outbox", activity)
 
       assert json_response(conn, 400)
     end

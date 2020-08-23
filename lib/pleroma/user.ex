@@ -501,7 +501,15 @@ defmodule Pleroma.User do
 
     params = Map.put(params, :last_refreshed_at, NaiveDateTime.utc_now())
 
-    params = if remote?, do: truncate_fields_param(params), else: params
+    params =
+      if remote? do
+        params
+        |> truncate_fields_param()
+        |> truncate_if_exists(:name, name_limit)
+        |> truncate_if_exists(:bio, bio_limit)
+      else
+        params
+      end
 
     struct
     |> cast(
@@ -1191,8 +1199,12 @@ defmodule Pleroma.User do
   end
 
   @spec get_recipients_from_activity(Activity.t()) :: [User.t()]
-  def get_recipients_from_activity(%Activity{recipients: to}) do
-    User.Query.build(%{recipients_from_activity: to, local: true, deactivated: false})
+  def get_recipients_from_activity(%Activity{recipients: to, actor: actor}) do
+    to = [actor | to]
+
+    query = User.Query.build(%{recipients_from_activity: to, local: true, deactivated: false})
+
+    query
     |> Repo.all()
   end
 
