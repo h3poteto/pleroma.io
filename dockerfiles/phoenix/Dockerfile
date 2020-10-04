@@ -5,6 +5,10 @@ ENV APP_DIR /var/opt/app
 ADD . ${APP_DIR}
 RUN chown -R elixir:elixir ${APP_DIR}
 
+RUN set -ex && \
+    apt-get update && \
+    apt-get install -y cmake
+
 USER elixir
 ENV MIX_ENV=prod
 
