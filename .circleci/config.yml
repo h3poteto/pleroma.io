@@ -3,6 +3,7 @@ jobs:
   build:
     docker:
       - image: ghcr.io/h3poteto/elixir:latest
+        user: root
         environment:
           MIX_ENV: test
           DB_HOST: 127.0.0.1
@@ -11,6 +12,7 @@ jobs:
           DB_NAME: pleroma_test
           ROLLBAR_ACCESS_TOKEN: dummy
       - image: postgres:11.2-alpine
+        command: ["postgres", "-c", "fsync=off", "-c", "synchronous_commit=off", "-c", "full_page_writes=off"]
         environment:
           POSTGRES_USER: pleroma
           POSTGRES_PASSWORD: pleroma
@@ -18,6 +20,10 @@ jobs:
     working_directory: /var/opt/app
     steps:
       - checkout
+      - run:
+          name: OS packages
+          command: |
+            apt-get update && apt-get install -y libimage-exiftool-perl ffmpeg
       - restore_cache:
           name: Restoring cache - deps
           keys:

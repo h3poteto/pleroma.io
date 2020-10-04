@@ -31,7 +31,7 @@ defmodule Pleroma.Plugs.HTTPSecurityPlug do
       {"x-content-type-options", "nosniff"},
       {"referrer-policy", referrer_policy},
       {"x-download-options", "noopen"},
-      {"content-security-policy", csp_string() <> ";"}
+      {"content-security-policy", csp_string()}
     ]
 
     if report_uri do
@@ -43,11 +43,22 @@ defmodule Pleroma.Plugs.HTTPSecurityPlug do
         ]
       }
 
-      headers ++ [{"reply-to", Jason.encode!(report_group)}]
+      [{"reply-to", Jason.encode!(report_group)} | headers]
     else
       headers
     end
   end
+
+  static_csp_rules = [
+    "default-src 'none'",
+    "base-uri 'self'",
+    "frame-ancestors 'none'",
+    "style-src 'self' 'unsafe-inline'",
+    "font-src 'self'",
+    "manifest-src 'self'"
+  ]
+
+  @csp_start [Enum.join(static_csp_rules, ";") <> ";"]
 
   defp csp_string do
     scheme = Config.get([Pleroma.Web.Endpoint, :url])[:scheme]
@@ -55,41 +66,104 @@ defmodule Pleroma.Plugs.HTTPSecurityPlug do
     websocket_url = Pleroma.Web.Endpoint.websocket_url()
     report_uri = Config.get([:http_security, :report_uri])
 
-    connect_src = "connect-src 'self' #{static_url} #{websocket_url}"
+    img_src = "img-src 'self' data: blob:"
+    media_src = "media-src 'self'"
+
+    # Strict multimedia CSP enforcement only when MediaProxy is enabled
+    {img_src, media_src} =
+      if Config.get([:media_proxy, :enabled]) &&
+           !Config.get([:media_proxy, :proxy_opts, :redirect_on_failure]) do
+        sources = build_csp_multimedia_source_list()
+        {[img_src, sources], [media_src, sources]}
+      else
+        {[img_src, " https:"], [media_src, " https:"]}
+      end
+
+    connect_src = ["connect-src 'self' blob: ", static_url, ?\s, websocket_url]
 
     connect_src =
-      if Pleroma.Config.get(:env) == :dev do
-        connect_src <> " http://localhost:3035/"
+      if Config.get(:env) == :dev do
+        [connect_src, " http://localhost:3035/"]
       else
         connect_src
       end
 
     script_src =
-      if Pleroma.Config.get(:env) == :dev do
+      if Config.get(:env) == :dev do
         "script-src 'self' 'unsafe-eval'"
       else
         "script-src 'self'"
       end
 
-    main_part = [
-      "default-src 'none'",
-      "base-uri 'self'",
-      "frame-ancestors 'none'",
-      "img-src 'self' data: blob: https:",
-      "media-src 'self' https:",
-      "style-src 'self' 'unsafe-inline'",
-      "font-src 'self'",
-      "manifest-src 'self'",
-      connect_src,
-      script_src
-    ]
+    report = if report_uri, do: ["report-uri ", report_uri, ";report-to csp-endpoint"]
+    insecure = if scheme == "https", do: "upgrade-insecure-requests"
 
-    report = if report_uri, do: ["report-uri #{report_uri}; report-to csp-endpoint"], else: []
+    @csp_start
+    |> add_csp_param(img_src)
+    |> add_csp_param(media_src)
+    |> add_csp_param(connect_src)
+    |> add_csp_param(script_src)
+    |> add_csp_param(insecure)
+    |> add_csp_param(report)
+    |> :erlang.iolist_to_binary()
+  end
 
-    insecure = if scheme == "https", do: ["upgrade-insecure-requests"], else: []
+  defp build_csp_from_whitelist([], acc), do: acc
 
-    (main_part ++ report ++ insecure)
-    |> Enum.join("; ")
+  defp build_csp_from_whitelist([last], acc) do
+    [build_csp_param_from_whitelist(last) | acc]
+  end
+
+  defp build_csp_from_whitelist([head | tail], acc) do
+    build_csp_from_whitelist(tail, [[?\s, build_csp_param_from_whitelist(head)] | acc])
+  end
+
+  # TODO: use `build_csp_param/1` after removing support bare domains for media proxy whitelist
+  defp build_csp_param_from_whitelist("http" <> _ = url) do
+    build_csp_param(url)
+  end
+
+  defp build_csp_param_from_whitelist(url), do: url
+
+  defp build_csp_multimedia_source_list do
+    media_proxy_whitelist =
+      [:media_proxy, :whitelist]
+      |> Config.get()
+      |> build_csp_from_whitelist([])
+
+    captcha_method = Config.get([Pleroma.Captcha, :method])
+    captcha_endpoint = Config.get([captcha_method, :endpoint])
+
+    base_endpoints =
+      [
+        [:media_proxy, :base_url],
+        [Pleroma.Upload, :base_url],
+        [Pleroma.Uploaders.S3, :public_endpoint]
+      ]
+      |> Enum.map(&Config.get/1)
+
+    [captcha_endpoint | base_endpoints]
+    |> Enum.map(&build_csp_param/1)
+    |> Enum.reduce([], &add_source(&2, &1))
+    |> add_source(media_proxy_whitelist)
+  end
+
+  defp add_source(iodata, nil), do: iodata
+  defp add_source(iodata, []), do: iodata
+  defp add_source(iodata, source), do: [[?\s, source] | iodata]
+
+  defp add_csp_param(csp_iodata, nil), do: csp_iodata
+
+  defp add_csp_param(csp_iodata, param), do: [[param, ?;] | csp_iodata]
+
+  defp build_csp_param(nil), do: nil
+
+  defp build_csp_param(url) when is_binary(url) do
+    %{host: host, scheme: scheme} = URI.parse(url)
+
+    if scheme do
+      [scheme, "://", host]
+    end
   end
 
   def warn_if_disabled do

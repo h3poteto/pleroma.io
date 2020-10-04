@@ -6,6 +6,8 @@ defmodule Pleroma.Web.Endpoint do
   use Phoenix.Endpoint, otp_app: :pleroma
   use Sentry.Phoenix.Endpoint
 
+  require Pleroma.Constants
+
   socket("/socket", Pleroma.Web.UserSocket)
 
   plug(Pleroma.Plugs.SetLocalePlug)
@@ -27,17 +29,10 @@ defmodule Pleroma.Web.Endpoint do
     }
   )
 
-  # Serve at "/" the static files from "priv/static" directory.
-  #
-  # You should set gzip to true if you are running phoenix.digest
-  # when deploying your static files in production.
-  plug(
-    Plug.Static,
+  # Careful! No `only` restriction here, as we don't know what frontends contain.
+  plug(Pleroma.Plugs.FrontendStatic,
     at: "/",
-    from: :pleroma,
-    only:
-      ~w(index.html robots.txt static finmoji emoji packs sounds images instance sw.js sw-pleroma.js favicon.png schemas doc),
-    # credo:disable-for-previous-line Credo.Check.Readability.MaxLineLength
+    frontend_type: :primary,
     gzip: true,
     cache_control_for_etags: @static_cache_control,
     headers: %{
@@ -46,6 +41,33 @@ defmodule Pleroma.Web.Endpoint do
   )
 
   plug(Plug.Static.IndexHtml, at: "/pleroma/admin/")
+
+  plug(Pleroma.Plugs.FrontendStatic,
+    at: "/pleroma/admin",
+    frontend_type: :admin,
+    gzip: true,
+    cache_control_for_etags: @static_cache_control,
+    headers: %{
+      "cache-control" => @static_cache_control
+    }
+  )
+
+  # Serve at "/" the static files from "priv/static" directory.
+  #
+  # You should set gzip to true if you are running phoenix.digest
+  # when deploying your static files in production.
+  plug(
+    Plug.Static,
+    at: "/",
+    from: :pleroma,
+    only: Pleroma.Constants.static_only_files(),
+    # credo:disable-for-previous-line Credo.Check.Readability.MaxLineLength
+    gzip: true,
+    cache_control_for_etags: @static_cache_control,
+    headers: %{
+      "cache-control" => @static_cache_control
+    }
+  )
 
   plug(Plug.Static,
     at: "/pleroma/admin/",

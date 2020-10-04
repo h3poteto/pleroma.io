@@ -3,12 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 
 defmodule Pleroma.Web.RichMedia.Parser do
-  @hackney_options [
-    pool: :media,
-    recv_timeout: 2_000,
-    max_body: 2_000_000,
-    with_body: true
-  ]
+  require Logger
 
   defp parsers do
     Pleroma.Config.get([:rich_media, :parsers])
@@ -17,17 +12,37 @@ defmodule Pleroma.Web.RichMedia.Parser do
   def parse(nil), do: {:error, "No URL provided"}
 
   if Pleroma.Config.get(:env) == :test do
+    @spec parse(String.t()) :: {:ok, map()} | {:error, any()}
     def parse(url), do: parse_url(url)
   else
+    @spec parse(String.t()) :: {:ok, map()} | {:error, any()}
     def parse(url) do
-      try do
-        Cachex.fetch!(:rich_media_cache, url, fn _ ->
-          {:commit, parse_url(url)}
-        end)
-        |> set_ttl_based_on_image(url)
-      rescue
-        e ->
-          {:error, "Cachex error: #{inspect(e)}"}
+      with {:ok, data} <- get_cached_or_parse(url),
+           {:ok, _} <- set_ttl_based_on_image(data, url) do
+        {:ok, data}
+      else
+        error ->
+          Logger.error(fn -> "Rich media error: #{inspect(error)}" end)
+      end
+    end
+
+    defp get_cached_or_parse(url) do
+      case Cachex.fetch!(:rich_media_cache, url, fn _ -> {:commit, parse_url(url)} end) do
+        {:ok, _data} = res ->
+          res
+
+        {:error, :body_too_large} = e ->
+          e
+
+        {:error, {:content_type, _}} = e ->
+          e
+
+        # The TTL is not set for the errors above, since they are unlikely to change
+        # with time
+        {:error, _} = e ->
+          ttl = Pleroma.Config.get([:rich_media, :failure_backoff], 60_000)
+          Cachex.expire(:rich_media_cache, url, ttl)
+          e
       end
     end
   end
@@ -54,19 +69,26 @@ defmodule Pleroma.Web.RichMedia.Parser do
       config :pleroma, :rich_media,
         ttl_setters: [MyModule]
   """
-  def set_ttl_based_on_image({:ok, data}, url) do
-    with {:ok, nil} <- Cachex.ttl(:rich_media_cache, url),
-         ttl when is_number(ttl) <- get_ttl_from_image(data, url) do
-      Cachex.expire_at(:rich_media_cache, url, ttl * 1000)
-      {:ok, data}
-    else
+  @spec set_ttl_based_on_image(map(), String.t()) ::
+          {:ok, Integer.t() | :noop} | {:error, :no_key}
+  def set_ttl_based_on_image(data, url) do
+    case get_ttl_from_image(data, url) do
+      {:ok, ttl} when is_number(ttl) ->
+        ttl = ttl * 1000
+
+        case Cachex.expire_at(:rich_media_cache, url, ttl) do
+          {:ok, true} -> {:ok, ttl}
+          {:ok, false} -> {:error, :no_key}
+        end
+
       _ ->
-        {:ok, data}
+        {:ok, :noop}
     end
   end
 
   defp get_ttl_from_image(data, url) do
-    Pleroma.Config.get([:rich_media, :ttl_setters])
+    [:rich_media, :ttl_setters]
+    |> Pleroma.Config.get()
     |> Enum.reduce({:ok, nil}, fn
       module, {:ok, _ttl} ->
         module.ttl(data, url)
@@ -77,34 +99,27 @@ defmodule Pleroma.Web.RichMedia.Parser do
   end
 
   defp parse_url(url) do
-    try do
-      {:ok, %Tesla.Env{body: html}} = Pleroma.HTTP.get(url, [], adapter: @hackney_options)
-
+    with {:ok, %Tesla.Env{body: html}} <- Pleroma.Web.RichMedia.Helpers.rich_media_get(url),
+         {:ok, html} <- Floki.parse_document(html) do
       html
-      |> parse_html()
       |> maybe_parse()
-      |> Map.put(:url, url)
+      |> Map.put("url", url)
       |> clean_parsed_data()
       |> check_parsed_data()
-    rescue
-      e ->
-        {:error, "Parsing error: #{inspect(e)} #{inspect(__STACKTRACE__)}"}
     end
   end
-
-  defp parse_html(html), do: Floki.parse_document!(html)
 
   defp maybe_parse(html) do
     Enum.reduce_while(parsers(), %{}, fn parser, acc ->
       case parser.parse(html, acc) do
-        {:ok, data} -> {:halt, data}
-        {:error, _msg} -> {:cont, acc}
+        data when data != %{} -> {:halt, data}
+        _ -> {:cont, acc}
       end
     end)
   end
 
-  defp check_parsed_data(%{title: title} = data)
-       when is_binary(title) and byte_size(title) > 0 do
+  defp check_parsed_data(%{"title" => title} = data)
+       when is_binary(title) and title != "" do
     {:ok, data}
   end
 
@@ -115,11 +130,7 @@ defmodule Pleroma.Web.RichMedia.Parser do
   defp clean_parsed_data(data) do
     data
     |> Enum.reject(fn {key, val} ->
-      with {:ok, _} <- Jason.encode(%{key => val}) do
-        false
-      else
-        _ -> true
-      end
+      not match?({:ok, _}, Jason.encode(%{key => val}))
     end)
     |> Map.new()
   end
