@@ -18,6 +18,7 @@ defmodule Pleroma.Web.Preload.Providers.InstanceTest do
     assert String.equivalent?(description, "Pleroma: An efficient and flexible fediverse server")
   end
 
+  @tag :skip
   test "it renders the panel", %{"/instance/panel.html" => panel} do
     assert String.contains?(
              panel,
