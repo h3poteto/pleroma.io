@@ -165,18 +165,18 @@ defmodule Pleroma.HTMLTest do
     end
   end
 
-  describe "extract_first_external_url" do
+  describe "extract_first_external_url_from_object" do
     test "extracts the url" do
       user = insert(:user)
 
       {:ok, activity} =
         CommonAPI.post(user, %{
-          "status" =>
+          status:
             "I think I just found the best github repo https://github.com/komeiji-satori/Dress"
         })
 
       object = Object.normalize(activity)
-      {:ok, url} = HTML.extract_first_external_url(object, object.data["content"])
+      {:ok, url} = HTML.extract_first_external_url_from_object(object)
       assert url == "https://github.com/komeiji-satori/Dress"
     end
 
@@ -186,12 +186,12 @@ defmodule Pleroma.HTMLTest do
 
       {:ok, activity} =
         CommonAPI.post(user, %{
-          "status" =>
+          status:
             "@#{other_user.nickname} install misskey! https://github.com/syuilo/misskey/blob/develop/docs/setup.en.md"
         })
 
       object = Object.normalize(activity)
-      {:ok, url} = HTML.extract_first_external_url(object, object.data["content"])
+      {:ok, url} = HTML.extract_first_external_url_from_object(object)
 
       assert url == "https://github.com/syuilo/misskey/blob/develop/docs/setup.en.md"
 
@@ -203,12 +203,11 @@ defmodule Pleroma.HTMLTest do
 
       {:ok, activity} =
         CommonAPI.post(user, %{
-          "status" =>
-            "#cofe https://www.pixiv.net/member_illust.php?mode=medium&illust_id=72255140"
+          status: "#cofe https://www.pixiv.net/member_illust.php?mode=medium&illust_id=72255140"
         })
 
       object = Object.normalize(activity)
-      {:ok, url} = HTML.extract_first_external_url(object, object.data["content"])
+      {:ok, url} = HTML.extract_first_external_url_from_object(object)
 
       assert url == "https://www.pixiv.net/member_illust.php?mode=medium&illust_id=72255140"
     end
@@ -218,13 +217,13 @@ defmodule Pleroma.HTMLTest do
 
       {:ok, activity} =
         CommonAPI.post(user, %{
-          "status" =>
+          status:
             "<a href=\"https://pleroma.gov/tags/cofe\" rel=\"tag\">#cofe</a> https://www.pixiv.net/member_illust.php?mode=medium&illust_id=72255140",
-          "content_type" => "text/html"
+          content_type: "text/html"
         })
 
       object = Object.normalize(activity)
-      {:ok, url} = HTML.extract_first_external_url(object, object.data["content"])
+      {:ok, url} = HTML.extract_first_external_url_from_object(object)
 
       assert url == "https://www.pixiv.net/member_illust.php?mode=medium&illust_id=72255140"
     end
@@ -232,12 +231,25 @@ defmodule Pleroma.HTMLTest do
     test "does not crash when there is an HTML entity in a link" do
       user = insert(:user)
 
-      {:ok, activity} =
-        CommonAPI.post(user, %{"status" => "\"http://cofe.com/?boomer=ok&foo=bar\""})
+      {:ok, activity} = CommonAPI.post(user, %{status: "\"http://cofe.com/?boomer=ok&foo=bar\""})
 
       object = Object.normalize(activity)
 
-      assert {:ok, nil} = HTML.extract_first_external_url(object, object.data["content"])
+      assert {:ok, nil} = HTML.extract_first_external_url_from_object(object)
+    end
+
+    test "skips attachment links" do
+      user = insert(:user)
+
+      {:ok, activity} =
+        CommonAPI.post(user, %{
+          status:
+            "<a href=\"https://pleroma.gov/media/d24caa3a498e21e0298377a9ca0149a4f4f8b767178aacf837542282e2d94fb1.png?name=image.png\" class=\"attachment\">image.png</a>"
+        })
+
+      object = Object.normalize(activity)
+
+      assert {:ok, nil} = HTML.extract_first_external_url_from_object(object)
     end
   end
 end

@@ -29,7 +29,7 @@ defmodule Pleroma.Web.ActivityPub.UserViewTest do
 
     {:ok, user} =
       insert(:user)
-      |> User.upgrade_changeset(%{fields: fields})
+      |> User.update_changeset(%{fields: fields})
       |> User.update_and_set_cache()
 
     assert %{
@@ -38,7 +38,7 @@ defmodule Pleroma.Web.ActivityPub.UserViewTest do
   end
 
   test "Renders with emoji tags" do
-    user = insert(:user, emoji: [%{"bib" => "/test"}])
+    user = insert(:user, emoji: %{"bib" => "/test"})
 
     assert %{
              "tag" => [
@@ -159,34 +159,22 @@ defmodule Pleroma.Web.ActivityPub.UserViewTest do
     end
   end
 
-  test "activity collection page aginates correctly" do
-    user = insert(:user)
+  describe "acceptsChatMessages" do
+    test "it returns this value if it is set" do
+      true_user = insert(:user, accepts_chat_messages: true)
+      false_user = insert(:user, accepts_chat_messages: false)
+      nil_user = insert(:user, accepts_chat_messages: nil)
 
-    posts =
-      for i <- 0..25 do
-        {:ok, activity} = CommonAPI.post(user, %{"status" => "post #{i}"})
-        activity
-      end
+      assert %{"capabilities" => %{"acceptsChatMessages" => true}} =
+               UserView.render("user.json", user: true_user)
 
-    # outbox sorts chronologically, newest first, with ten per page
-    posts = Enum.reverse(posts)
+      assert %{"capabilities" => %{"acceptsChatMessages" => false}} =
+               UserView.render("user.json", user: false_user)
 
-    %{"next" => next_url} =
-      UserView.render("activity_collection_page.json", %{
-        iri: "#{user.ap_id}/outbox",
-        activities: Enum.take(posts, 10)
-      })
-
-    next_id = Enum.at(posts, 9).id
-    assert next_url =~ next_id
-
-    %{"next" => next_url} =
-      UserView.render("activity_collection_page.json", %{
-        iri: "#{user.ap_id}/outbox",
-        activities: Enum.take(Enum.drop(posts, 10), 10)
-      })
-
-    next_id = Enum.at(posts, 19).id
-    assert next_url =~ next_id
+      refute Map.has_key?(
+               UserView.render("user.json", user: nil_user)["capabilities"],
+               "acceptsChatMessages"
+             )
+    end
   end
 end
