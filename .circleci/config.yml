@@ -117,7 +117,6 @@ jobs:
             git checkout -b update-pleromaio-image-${CIRCLE_SHA1}
             sed -i -e "s/\(564677439943\.dkr\.ecr\.ap-northeast-1\.amazonaws\.com\/h3poteto\/pleroma\/phoenix:\)[0-9a-z]\+.*$/\1$CIRCLE_SHA1/g" external-prd/pleromaio/deployment.yml
             sed -i -e "s/\(564677439943\.dkr\.ecr\.ap-northeast-1\.amazonaws\.com\/h3poteto\/pleroma\/nginx:\)[0-9a-z]\+.*$/\1$CIRCLE_SHA1/g" external-prd/pleromaio/deployment.yml
-            sed -i -e "s/\(564677439943\.dkr\.ecr\.ap-northeast-1\.amazonaws\.com\/h3poteto\/pleroma\/phoenix:\)[0-9a-z]\+.*$/\1$CIRCLE_SHA1/g" external-prd/pleromaio/job.yml
             git add .
             git commit -m "Update docker image for pleromaio to ${CIRCLE_SHA1}"
             git push --set-upstream origin update-pleromaio-image-${CIRCLE_SHA1}
