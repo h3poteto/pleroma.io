@@ -8,7 +8,7 @@ defmodule Pleroma.Web.AdminAPI.InstanceDocumentControllerTest do
   alias Pleroma.Config
 
   @dir "test/tmp/instance_static"
-  @default_instance_panel ~s(<p>Welcome to <a href="https://pleroma.social" target="_blank">Pleroma!</a></p>)
+  @default_instance_panel ~s(<p>Welcome to Pleroma.io. This is a <a href="https://pleroma.social" target="_blank">Pleroma</a> instance, federated with a larger microblogging network.</p>)
 
   setup do
     File.mkdir_p!(@dir)
