@@ -34,7 +34,8 @@ config :pleroma, Pleroma.Repo,
 
 config :pleroma, Pleroma.Uploaders.S3,
   bucket: System.get_env("S3_BUCKET"),
-  public_endpoint: "https://media.pleroma.io"
+  public_endpoint: "https://media.pleroma.io",
+  truncated_namespace: ""
 
 config :ex_aws,
   # We have to set dummy profile to use web identity adapter.
