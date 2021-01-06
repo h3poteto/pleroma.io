@@ -34,9 +34,7 @@ config :pleroma, Pleroma.Repo,
 
 config :pleroma, Pleroma.Uploaders.S3,
   bucket: System.get_env("S3_BUCKET"),
-  # Using CloudFront which name is same as s3 bucket name.
-  # So if we set public endpoint, the URL is `https://media.pleroma.io/media.pleroma.io/filename.png`.
-  public_endpoint: "https://"
+  public_endpoint: "https://media.pleroma.io"
 
 config :ex_aws,
   # We have to set dummy profile to use web identity adapter.
