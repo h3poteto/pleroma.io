@@ -1,13 +1,9 @@
-FROM ghcr.io/h3poteto/elixir:1.10.4-slim-buster
+FROM ghcr.io/h3poteto/pleroma:1.11.2-slim-buster
 
 USER root
 ENV APP_DIR /var/opt/app
 ADD . ${APP_DIR}
 RUN chown -R elixir:elixir ${APP_DIR}
-
-RUN set -ex && \
-    apt-get update && \
-    apt-get install -y cmake
 
 USER elixir
 ENV MIX_ENV=prod

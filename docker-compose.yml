@@ -1,7 +1,7 @@
 version: "3.0"
 services:
   elixir:
-    image: ghcr.io/h3poteto/elixir:latest
+    image: ghcr.io/h3poteto/pleroma:latest
     working_dir: /var/opt/app
     environment:
       MIX_ENV: dev

@@ -52,6 +52,9 @@ defmodule Pleroma.Emails.AdminEmail do
               status_url = Helpers.o_status_url(Pleroma.Web.Endpoint, :notice, id)
               "<li><a href=\"#{status_url}\">#{status_url}</li>"
 
+            %{"id" => id} when is_binary(id) ->
+              "<li><a href=\"#{id}\">#{id}</li>"
+
             id when is_binary(id) ->
               "<li><a href=\"#{id}\">#{id}</li>"
           end)
@@ -88,7 +91,7 @@ defmodule Pleroma.Emails.AdminEmail do
     html_body = """
     <p>New account for review: <a href="#{user_url(account)}">@#{account.nickname}</a></p>
     <blockquote>#{HTML.strip_tags(account.registration_reason)}</blockquote>
-    <a href="#{Pleroma.Web.base_url()}/pleroma/admin">Visit AdminFE</a>
+    <a href="#{Pleroma.Web.base_url()}/pleroma/admin/#/users/#{account.id}/">Visit AdminFE</a>
     """
 
     new()
