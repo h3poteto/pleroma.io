@@ -1,13 +1,15 @@
 version: "3.0"
 services:
   elixir:
-    image: ghcr.io/h3poteto/pleroma:latest
+    image: ghcr.io/h3poteto/pleroma:1.11.3-slim-buster
+    user: root
     working_dir: /var/opt/app
     environment:
       MIX_ENV: dev
-      ROLLBAR_ACCESS_TOKEN: dummy
     volumes:
       - .:/var/opt/app
+      - deps:/var/opt/app/deps
+      - build:/var/opt/app/_builds
     ports:
       - "4000:4000"
     links:
@@ -25,3 +27,5 @@ services:
 
 volumes:
   storage:
+  deps:
+  build:
