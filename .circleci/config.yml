@@ -10,7 +10,7 @@ jobs:
           DB_PASSWORD: pleroma
           DB_NAME: pleroma_test
           ROLLBAR_ACCESS_TOKEN: dummy
-      - image: postgres:11.2-alpine
+      - image: postgres:13.2-alpine
         command: ["postgres", "-c", "fsync=off", "-c", "synchronous_commit=off", "-c", "full_page_writes=off"]
         environment:
           POSTGRES_USER: pleroma
@@ -56,9 +56,6 @@ jobs:
             mix ecto.migrate
       - run:
           name: test
-          # Now, test command runs unit test for postgres-rum.
-          # https://git.pleroma.social/pleroma/pleroma/blob/v1.1.5/.gitlab-ci.yml#L57
-          # But we want to run unit test for normal postgres.
           command: |
             mix coveralls --preload-modules
 
