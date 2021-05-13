@@ -44,6 +44,11 @@ config :ex_aws,
   awscli_auth_adapter: ExAws.STS.AuthCache.AssumeRoleWebIdentityAdapter
 
 config :ex_aws, :s3,
+  # We have to set dummy profile to use web identity adapter.
+  # So this profile does not exist and don't prepare it.
+  secret_access_key: [{:awscli, "profile_name", 30}],
+  access_key_id: [{:awscli, "profile_name", 30}],
+  awscli_auth_adapter: ExAws.STS.AuthCache.AssumeRoleWebIdentityAdapter,
   region: "ap-northeast-1",
   scheme: "https://"
 
