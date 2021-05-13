@@ -142,5 +142,4 @@ workflows:
               only:
                 - master
           requires:
-            - build
             - image
