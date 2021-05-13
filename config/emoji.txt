@@ -1,5 +1,6 @@
 firefox, /emoji/Firefox.gif, Gif,Fun
 blank, /emoji/blank.png, Fun
+dinosaur, /emoji/dino walking.gif, Gif
 emacs, /emoji/custom/emacs.svg
 vim, /emoji/custom/vim.png
 vscode, /emoji/custom/vscode.png
@@ -34,3 +35,4 @@ arch_linux, /emoji/custom/arch_linux.png
 gentoo, /emoji/custom/gentoo.png
 mac, /emoji/custom/mac.png
 windows, /emoji/custom/windows.png
+
