@@ -27,7 +27,8 @@ config :pleroma, :instance,
   limit: 5000,
   registrations_open: false,
   invites_enabled: true,
-  dynamic_configuration: false
+  dynamic_configuration: false,
+  remote_post_retention_days: 365
 
 config :pleroma, :chat, enabled: false
 
