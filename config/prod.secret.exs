@@ -34,7 +34,6 @@ config :pleroma, Pleroma.Repo,
 
 config :pleroma, Pleroma.Uploaders.S3,
   bucket: System.get_env("S3_BUCKET"),
-  public_endpoint: "https://media.pleroma.io",
   truncated_namespace: ""
 
 config :ex_aws,
@@ -53,7 +52,9 @@ config :ex_aws, :s3,
   region: "ap-northeast-1",
   scheme: "https://"
 
-config :pleroma, Pleroma.Upload, uploader: Pleroma.Uploaders.S3
+config :pleroma, Pleroma.Upload,
+  uploader: Pleroma.Uploaders.S3,
+  base_url: "https://media.pleroma.io"
 
 config :pleroma, :chat, enabled: false
 
