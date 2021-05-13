@@ -5,7 +5,6 @@ use Mix.Config
 config :pleroma, Pleroma.Web.Endpoint,
   http: [ip: {0, 0, 0, 0}, port: 4000],
   url: [host: "pleroma.io", scheme: "https", port: 443],
-  server: true,
   secret_key_base: System.get_env("SECRET_KEY_BASE")
 
 config :pleroma, :media_proxy,
