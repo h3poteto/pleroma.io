@@ -2,7 +2,7 @@ version: 2
 jobs:
   build:
     docker:
-      - image: ghcr.io/h3poteto/pleroma:latest
+      - image: ghcr.io/h3poteto/pleroma:1.11.3-slim-buster
         environment:
           MIX_ENV: test
           DB_HOST: 127.0.0.1
@@ -22,13 +22,18 @@ jobs:
       - restore_cache:
           name: Restoring cache - deps
           keys:
-            - vendor-{{ checksum "mix.exs" }}-{{ checksum "mix.lock" }}
-            - vendor-{{ checksum "mix.exs" }}-
+            - deps-1.11.3-{{ checksum "mix.exs" }}-{{ checksum "mix.lock" }}
+            - deps-1.11.3-{{ checksum "mix.exs" }}-
       - restore_cache:
           name: Restoring cache - _build
           keys:
-            - _build-{{ checksum "mix.exs" }}-{{ checksum "mix.lock" }}
-            - _build-{{ checksum "mix.exs" }}
+            - _build-1.11.3-{{ checksum "mix.exs" }}-{{ checksum "mix.lock" }}
+            - _build-1.11.3-{{ checksum "mix.exs" }}
+      - restore_cache:
+          name: Restoring cache - home
+          keys:
+            - home-1.11.3-{{ checksum "mix.exs" }}-{{ checksum "mix.lock" }}
+            - home-1.11.3-{{ checksum "mix.exs" }}
       - run:
           name: Mix packages install
           command: |
@@ -36,7 +41,7 @@ jobs:
             mix deps.get
       - save_cache:
           name: Saving cache - deps
-          key: deps-{{ checksum "mix.exs" }}-{{ checksum "mix.lock" }}
+          key: deps-1.11.3-{{ checksum "mix.exs" }}-{{ checksum "mix.lock" }}
           paths:
             - "deps"
       - run:
@@ -46,9 +51,16 @@ jobs:
             mix deps.compile
       - save_cache:
           name: Saving cache - _build
-          key: _build-{{ checksum "mix.exs" }}-{{ checksum "mix.lock" }}
+          key: _build-1.11.3-{{ checksum "mix.exs" }}-{{ checksum "mix.lock" }}
           paths:
             - "_build"
+      - save_cache:
+          name: Saving cache - home
+          key: home-1.11.3-{{ checksum "mix.exs" }}-{{ checksum "mix.lock" }}
+          paths:
+            - "~/.cache"
+            - "~/.mix"
+            - "~/.hex"
       - run:
           name: Migration database
           command: |
