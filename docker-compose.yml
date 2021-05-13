@@ -6,6 +6,10 @@ services:
     working_dir: /var/opt/app
     environment:
       MIX_ENV: dev
+      DB_USER: pleroma
+      DB_PASSWORD: pleroma
+      DB_NAME: pleroma_dev
+      DB_HOST: db
     volumes:
       - .:/var/opt/app
       - deps:/var/opt/app/deps
