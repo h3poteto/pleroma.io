@@ -15,10 +15,10 @@ config :pleroma, Pleroma.Web.Endpoint,
 
 config :pleroma, Pleroma.Repo,
   adapter: Ecto.Adapters.Postgres,
-  username: "pleroma",
-  password: "pleroma",
-  database: "pleroma_dev",
-  hostname: "db",
+  username: System.get_env("DB_USER"),
+  password: System.get_env("DB_PASSWORD"),
+  database: System.get_env("DB_NAME"),
+  hostname: System.get_env("DB_HOST"),
   pool_size: 10
 
 config :pleroma, :instance,
