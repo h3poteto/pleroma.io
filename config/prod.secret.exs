@@ -86,3 +86,10 @@ config :sentry,
   included_environments: [:prod],
   enable_source_code_context: true,
   root_source_code_path: File.cwd!()
+
+config :prometheus, Pleroma.Web.Endpoint.MetricsExporter,
+  enabled: true,
+  auth: {:basic, System.get_env("METRICS_USER"), System.get_env("METRICS_PASSWORD")},
+  ip_whitelist: [],
+  path: "/api/pleroma/app_metrics",
+  format: :text
