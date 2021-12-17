@@ -87,9 +87,11 @@ config :sentry,
   enable_source_code_context: true,
   root_source_code_path: File.cwd!()
 
-config :prometheus, Pleroma.Web.Endpoint.MetricsExporter,
-  enabled: true,
-  auth: {:basic, System.fetch_env!("METRICS_USER"), System.fetch_env!("METRICS_PASSWORD")},
-  ip_whitelist: [],
-  path: "/api/pleroma/app_metrics",
-  format: :text
+# MetricsExport will not read env when runtime
+# So I want to use runtime.exs instead of Mix.Config, but it is not supported, so I'm waiting.
+# config :prometheus, Pleroma.Web.Endpoint.MetricsExporter,
+#   enabled: true,
+#   auth: {:basic, System.fetch_env!("METRICS_USER"), System.fetch_env!("METRICS_PASSWORD")},
+#   ip_whitelist: [],
+#   path: "/api/pleroma/app_metrics",
+#   format: :text
