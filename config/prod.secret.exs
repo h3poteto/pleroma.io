@@ -89,7 +89,7 @@ config :sentry,
 
 config :prometheus, Pleroma.Web.Endpoint.MetricsExporter,
   enabled: true,
-  auth: {:basic, System.get_env("METRICS_USER"), System.get_env("METRICS_PASSWORD")},
+  auth: {:basic, System.fetch_env!("METRICS_USER"), System.fetch_env!("METRICS_PASSWORD")},
   ip_whitelist: [],
   path: "/api/pleroma/app_metrics",
   format: :text

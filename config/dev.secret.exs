@@ -37,3 +37,10 @@ config :pleroma, :frontend_configurations,
     showInstanceSpecificPanel: true,
     scopeOptionsEnabled: false
   }
+
+config :prometheus, Pleroma.Web.Endpoint.MetricsExporter,
+  enabled: true,
+  auth: {:basic, "hoge", "fuga"},
+  ip_whitelist: [],
+  path: "/api/pleroma/app_metrics",
+  format: :text
