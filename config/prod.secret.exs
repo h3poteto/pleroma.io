@@ -87,6 +87,12 @@ config :sentry,
   enable_source_code_context: true,
   root_source_code_path: File.cwd!()
 
+config :rollbax,
+  access_token: System.get_env("ROLLBAR_ACCESS_TOKEN"),
+  environment: "production",
+  enable_crash_reports: true,
+  enabled: true
+
 # MetricsExport will not read env when runtime
 # So I want to use runtime.exs instead of Mix.Config, but it is not supported, so I'm waiting.
 # config :prometheus, Pleroma.Web.Endpoint.MetricsExporter,
