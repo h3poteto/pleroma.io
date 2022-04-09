@@ -835,6 +835,8 @@ defmodule Pleroma.Web.Router do
     |> Enum.uniq()
   end
 
+  defp handle_errors(_conn, %{reason: %Phoenix.Router.NoRouteError{}}), do: :ok
+
   defp handle_errors(conn, %{kind: kind, reason: reason, stack: stacktrace}) do
     conn =
       conn
