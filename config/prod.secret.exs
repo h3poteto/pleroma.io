@@ -78,14 +78,7 @@ config :web_push_encryption, :vapid_details,
   private_key: System.get_env("WEB_PUSH_PRIVATE_KEY")
 
 config :logger,
-  backends: [:console, Sentry.LoggerBackend]
-
-config :sentry,
-  dsn: System.get_env("SENTRY_DSN"),
-  environment_name: Mix.env(),
-  included_environments: [:prod],
-  enable_source_code_context: true,
-  root_source_code_path: File.cwd!()
+  backends: [:console]
 
 config :rollbax,
   access_token: System.get_env("ROLLBAR_ACCESS_TOKEN"),

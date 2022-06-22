@@ -193,7 +193,6 @@ defmodule Pleroma.Mixfile do
       {:captcha,
        git: "https://git.pleroma.social/pleroma/elixir-libraries/elixir-captcha.git",
        ref: "e0f16822d578866e186a0974d65ad58cddc1e2ab"},
-      {:sentry, "~> 7.0"},
       {:rollbax, github: "ForzaElixir/rollbax"},
       {:restarter, path: "./restarter"},
       {:majic,
