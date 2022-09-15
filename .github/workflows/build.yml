@@ -29,10 +29,6 @@ jobs:
           POSTGRES_USER: pleroma
           POSTGRES_PASSWORD: pleroma
           POSTGRES_DB: pleroma_test
-        options: >-
-          -c fsync=off
-          -c synchronous_commit=off
-          -c full_page_writes=off
         ports:
           - 5432:5432
 
