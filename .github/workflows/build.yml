@@ -29,6 +29,11 @@ jobs:
           POSTGRES_USER: pleroma
           POSTGRES_PASSWORD: pleroma
           POSTGRES_DB: pleroma_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
         ports:
           - 5432:5432
 
