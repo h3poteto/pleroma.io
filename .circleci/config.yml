@@ -19,6 +19,9 @@ jobs:
     working_directory: /var/opt/app
     steps:
       - checkout
+      - run:
+          name: Check
+          command: cat config/test.secret.exs
       - restore_cache:
           name: Restoring cache - deps
           keys:
@@ -39,6 +42,9 @@ jobs:
           key: deps-1.13.4-{{ .Environment.CACHE_KEY }}-{{ checksum "mix.exs" }}-{{ checksum "mix.lock" }}
           paths:
             - "deps"
+      - run:
+          name: Check
+          command: cat config/test.secret.exs
       - run:
           name: Compile deps packages
           command: |
