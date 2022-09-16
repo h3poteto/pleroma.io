@@ -44,6 +44,7 @@ jobs:
           command: |
             mix local.rebar --force
             mix deps.compile
+            cat config/test.secret.exs
       - save_cache:
           name: Saving cache - _build
           key: _build-1.13.4-{{ .Environment.CACHE_KEY }}-{{ checksum "mix.exs" }}-{{ checksum "mix.lock" }}
