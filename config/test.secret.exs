@@ -1,4 +1,4 @@
-use Mix.Config
+import Config
 
 config :pleroma, Pleroma.Repo,
   adapter: Ecto.Adapters.Postgres,
