@@ -29,3 +29,12 @@ config :pleroma, :frontend_configurations,
     showInstanceSpecificPanel: true,
     scopeOptionsEnabled: false
   }
+
+config :pleroma, Pleroma.Repo,
+  adapter: Ecto.Adapters.Postgres,
+  username: System.get_env("DB_USER"),
+  password: System.get_env("DB_PASSWORD"),
+  database: System.get_env("DB_NAME"),
+  hostname: System.get_env("DB_HOST"),
+  pool_size: 10,
+  timeout: 60_000
