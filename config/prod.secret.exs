@@ -14,7 +14,7 @@ config :pleroma, :instance,
   registrations_open: false,
   invites_enabled: true,
   dynamic_configuration: false,
-  remote_post_retention_days: 365
+  remote_post_retention_days: 180
 
 config :ex_aws,
   # We have to set dummy profile to use web identity adapter.
