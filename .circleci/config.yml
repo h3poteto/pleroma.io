@@ -111,6 +111,13 @@ jobs:
             sudo mv /tmp/bin/hub /usr/local/bin/hub
             hub --version
       - run:
+          name: Install kustomize
+          command: |
+            curl -sSLf https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv4.5.7/kustomize_v4.5.7_linux_amd64.tar.gz | \
+            tar zxf - -C /tmp/ && \
+            sudo mv /tmp/kustomize /usr/local/bin/kustomize
+            kustomize version
+      - run:
           name: Update_tag_and_create_pr
           command: |
             git config --global user.name ${GITHUB_NAME}
@@ -119,8 +126,9 @@ jobs:
             cd k8s-services
             git init
             git checkout -b update-pleromaio-image-${CIRCLE_SHA1}
-            sed -i -e "s/\(564677439943\.dkr\.ecr\.ap-northeast-1\.amazonaws\.com\/h3poteto\/pleroma\/phoenix:\)[0-9a-z]\+.*$/\1$CIRCLE_SHA1/g" external-prd/pleromaio/deployment.yml
-            sed -i -e "s/\(564677439943\.dkr\.ecr\.ap-northeast-1\.amazonaws\.com\/h3poteto\/pleroma\/nginx:\)[0-9a-z]\+.*$/\1$CIRCLE_SHA1/g" external-prd/pleromaio/deployment.yml
+            cd external-prd/pleromaio
+            kustomize edit set image "phoenix=564677439943.dkr.ecr.ap-northeast-1.amazonaws.com/h3poteto/pleroma/phoenix:${CIRCLE_SHA1}"
+            kustomize edit set image "nginx=564677439943.dkr.ecr.ap-northeast-1.amazonaws.com/h3poteto/pleroma/nginx:${CIRCLE_SHA1}"
             git add .
             git commit -m "Update docker image for pleromaio to ${CIRCLE_SHA1}"
             git push --set-upstream origin update-pleromaio-image-${CIRCLE_SHA1}
