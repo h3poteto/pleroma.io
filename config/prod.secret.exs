@@ -63,3 +63,7 @@ config :logger,
 #   ip_whitelist: [],
 #   path: "/api/pleroma/app_metrics",
 #   format: :text
+
+if File.exists?("/opt/pleromaio/prod.secret.exs") do
+  import_config "/opt/pleromaio/prod.secret.exs"
+end
