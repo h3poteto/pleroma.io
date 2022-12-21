@@ -31,6 +31,10 @@ config :pleroma, :frontend_configurations,
   }
 
 config :pleroma, Pleroma.Repo,
+  prepare: :named,
+  parameters: [
+    plan_cache_mode: "force_custom_plan"
+  ],
   adapter: Ecto.Adapters.Postgres,
   username: System.get_env("DB_USER"),
   password: System.get_env("DB_PASSWORD"),
