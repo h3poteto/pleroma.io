@@ -14,7 +14,7 @@ config :pleroma, :instance,
   registrations_open: false,
   invites_enabled: true,
   dynamic_configuration: false,
-  remote_post_retention_days: 180
+  remote_post_retention_days: 90
 
 config :ex_aws,
   # We have to set dummy profile to use web identity adapter.
@@ -63,7 +63,3 @@ config :logger,
 #   ip_whitelist: [],
 #   path: "/api/pleroma/app_metrics",
 #   format: :text
-
-if File.exists?("/opt/pleromaio/prod.secret.exs") do
-  import_config "/opt/pleromaio/prod.secret.exs"
-end

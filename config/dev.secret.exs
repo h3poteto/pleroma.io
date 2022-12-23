@@ -20,7 +20,7 @@ config :pleroma, :instance,
   registrations_open: false,
   invites_enabled: true,
   dynamic_configuration: false,
-  remote_post_retention_days: 365
+  remote_post_retention_days: 60
 
 config :pleroma, :shout, enabled: false
 
@@ -29,16 +29,3 @@ config :pleroma, :frontend_configurations,
     showInstanceSpecificPanel: true,
     scopeOptionsEnabled: false
   }
-
-config :pleroma, Pleroma.Repo,
-  prepare: :named,
-  parameters: [
-    plan_cache_mode: "force_custom_plan"
-  ],
-  adapter: Ecto.Adapters.Postgres,
-  username: System.get_env("DB_USER"),
-  password: System.get_env("DB_PASSWORD"),
-  database: System.get_env("DB_NAME"),
-  hostname: System.get_env("DB_HOST"),
-  pool_size: 10,
-  timeout: 60_000
