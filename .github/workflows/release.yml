@@ -31,7 +31,7 @@ jobs:
         with:
           images: ${{ env.ECR_PHOENIX }}
           tags: |
-            type=sha
+            type=sha,format=long
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push Docker image
@@ -109,8 +109,8 @@ jobs:
           git init
           git checkout -b update-pleromaio-image-${{ github.sha }}
           cd external-prd/pleromaio
-          kustomize edit set image "phoenix=${{ env.ECR_PHOENIX }}:${{ github.sha }}"
-          kustomize edit set image "nginx=${{ env.ECR_NGINX }}:${{ github.sha }}"
+          kustomize edit set image "phoenix=${{ env.ECR_PHOENIX }}:sha-${{ github.sha }}"
+          kustomize edit set image "nginx=${{ env.ECR_NGINX }}:sha-${{ github.sha }}"
           git add .
           git commit -m "Update docker image for pleromaio to ${{ github.sha }}"
           git push --set-upstream origin update-pleromaio-image-${{ github.sha }}

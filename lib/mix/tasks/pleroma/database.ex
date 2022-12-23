@@ -19,6 +19,7 @@ defmodule Mix.Tasks.Pleroma.Database do
 
   @shortdoc "A collection of database related tasks"
   @moduledoc File.read!("docs/administration/CLI_tasks/database.md")
+  @requirements ["app.start"]
 
   def run(["remove_embedded_objects" | args]) do
     {options, [], []} =
@@ -29,7 +30,6 @@ defmodule Mix.Tasks.Pleroma.Database do
         ]
       )
 
-    start_pleroma()
     Logger.info("Removing embedded objects")
 
     Repo.query!(
@@ -44,13 +44,10 @@ defmodule Mix.Tasks.Pleroma.Database do
   end
 
   def run(["bump_all_conversations"]) do
-    start_pleroma()
     Conversation.bump_for_all_activities()
   end
 
   def run(["update_users_following_followers_counts"]) do
-    start_pleroma()
-
     Repo.transaction(
       fn ->
         from(u in User, select: u)
@@ -70,8 +67,6 @@ defmodule Mix.Tasks.Pleroma.Database do
           vacuum: :boolean
         ]
       )
-
-    start_pleroma()
 
     deadline = Pleroma.Config.get([:instance, :remote_post_retention_days])
 
@@ -111,8 +106,6 @@ defmodule Mix.Tasks.Pleroma.Database do
   end
 
   def run(["fix_likes_collections"]) do
-    start_pleroma()
-
     from(object in Object,
       where: fragment("(?)->>'likes' is not null", object.data),
       select: %{id: object.id, likes: fragment("(?)->>'likes'", object.data)}
@@ -141,13 +134,10 @@ defmodule Mix.Tasks.Pleroma.Database do
   end
 
   def run(["vacuum", args]) do
-    start_pleroma()
-
     Maintenance.vacuum(args)
   end
 
   def run(["ensure_expiration"]) do
-    start_pleroma()
     days = Pleroma.Config.get([:mrf_activity_expiration, :days], 365)
 
     Pleroma.Activity
@@ -181,7 +171,6 @@ defmodule Mix.Tasks.Pleroma.Database do
   end
 
   def run(["set_text_search_config", tsconfig]) do
-    start_pleroma()
     %{rows: [[tsc]]} = Ecto.Adapters.SQL.query!(Pleroma.Repo, "SHOW default_text_search_config;")
     shell_info("Current default_text_search_config: #{tsc}")
 
