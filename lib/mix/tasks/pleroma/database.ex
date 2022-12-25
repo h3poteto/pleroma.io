@@ -59,6 +59,30 @@ defmodule Mix.Tasks.Pleroma.Database do
     )
   end
 
+  def run(["all_prune_objects"]) do
+    deadline = Pleroma.Config.get([:instance, :remote_post_retention_days])
+
+    Logger.info("Pruning all objects older than #{deadline} days")
+
+    time_deadline =
+      NaiveDateTime.utc_now()
+      |> NaiveDateTime.add(-(deadline * 86_400))
+
+    from(o in Object,
+      where: o.inserted_at < ^time_deadline
+    )
+    |> Repo.delete_all(timeout: :infinity)
+
+    prune_hashtags_query = """
+    DELETE FROM hashtags AS ht
+    WHERE NOT EXISTS (
+      SELECT 1 FROM hashtags_objects hto
+      WHERE ht.id = hto.hashtag_id)
+    """
+
+    Repo.query(prune_hashtags_query)
+  end
+
   def run(["prune_objects" | args]) do
     {options, [], []} =
       OptionParser.parse(
