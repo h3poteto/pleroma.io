@@ -4,6 +4,7 @@
 
 defmodule Mix.Tasks.Pleroma.Database do
   alias Pleroma.Conversation
+  alias Pleroma.Delivery
   alias Pleroma.Maintenance
   alias Pleroma.Object
   alias Pleroma.Repo
@@ -69,6 +70,9 @@ defmodule Mix.Tasks.Pleroma.Database do
       |> NaiveDateTime.add(-(deadline * 86_400))
 
     from(o in Object,
+      left_join: deliveries in Delivery,
+      on: deliveries.object_id == o.id,
+      where: is_nil(deliveries.object_id),
       where: o.inserted_at < ^time_deadline
     )
     |> Repo.delete_all(timeout: :infinity)
