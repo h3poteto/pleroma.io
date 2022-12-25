@@ -2,7 +2,9 @@ import Config
 
 config :pleroma, :media_proxy,
   enabled: true,
-  redirect_on_failure: true
+  proxy_opts: [
+    redirect_on_failure: true
+  ]
 
 # base_url: "https://cache.pleroma.io"
 
