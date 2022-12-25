@@ -24,6 +24,12 @@ if config_env() == :prod do
     enabled: true
 end
 
+if System.get_env("REMOTE_POST_RETENTION_DAYS") do
+  config :pleroma, :instance,
+    remote_post_retention_days:
+      System.get_env("REMOTE_POST_RETENTION_DAYS") |> String.to_integer()
+end
+
 config :pleroma, Pleroma.Repo,
   prepare: :named,
   parameters: [
