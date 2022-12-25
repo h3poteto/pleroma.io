@@ -29,6 +29,7 @@ jobs:
           POSTGRES_USER: pleroma
           POSTGRES_PASSWORD: pleroma
           POSTGRES_DB: pleroma_test
+          POSTGRESQL_FSYNC: "off"
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -67,4 +68,4 @@ jobs:
         mix ecto.create
         mix ecto.migrate
     - name: Run tests
-      run: mix coveralls --preload-modules
+      run: mix test --cover --preload-modules
