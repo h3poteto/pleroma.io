@@ -43,7 +43,8 @@ config :pleroma, :shout, enabled: false
 config :pleroma, :frontend_configurations,
   pleroma_fe: %{
     showInstanceSpecificPanel: true,
-    scopeOptionsEnabled: false
+    scopeOptionsEnabled: false,
+    webPushNotifications: true
   }
 
 config :pleroma, :suggestions,
