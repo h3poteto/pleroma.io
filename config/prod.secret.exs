@@ -47,6 +47,8 @@ config :pleroma, :frontend_configurations,
     webPushNotifications: true
   }
 
+config :pleroma, Oban, log: :info
+
 config :pleroma, :suggestions,
   enabled: true,
   third_party_engine:
