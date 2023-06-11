@@ -119,7 +119,7 @@ jobs:
           cd k8s-services
           git init
           git checkout -b update-pleromaio-image-${{ github.sha }}
-          cd external-prd/pleromaio
+          cd external-prd/services/pleromaio
           kustomize edit set image "phoenix=${{ env.ECR_PHOENIX }}:sha-${{ github.sha }}"
           kustomize edit set image "nginx=${{ env.ECR_NGINX }}:sha-${{ github.sha }}"
           git add .
