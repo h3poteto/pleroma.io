@@ -22,6 +22,13 @@ if config_env() == :prod do
     environment: "production",
     enable_crash_reports: true,
     enabled: true
+
+  config :prometheus, Pleroma.Web.Endpoint.MetricsExporter,
+    enabled: true,
+    auth: {:basic, System.fetch_env!("METRICS_USER"), System.fetch_env!("METRICS_PASSWORD")},
+    ip_whitelist: [],
+    path: "/api/pleroma/app_metrics",
+    format: :text
 end
 
 if System.get_env("REMOTE_POST_RETENTION_DAYS") do
