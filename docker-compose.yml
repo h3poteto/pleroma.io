@@ -10,6 +10,8 @@ services:
       DB_PASSWORD: pleroma
       DB_NAME: pleroma_dev
       DB_HOST: db
+      METRICS_USER: metrics
+      METRICS_PASSWORD: metrics
     volumes:
       - .:/var/opt/app
       - deps:/var/opt/app/deps

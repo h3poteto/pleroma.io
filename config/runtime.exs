@@ -42,3 +42,10 @@ config :pleroma, Pleroma.Repo,
   hostname: System.fetch_env!("DB_HOST"),
   pool_size: 10,
   timeout: 60_000
+
+config :prometheus, Pleroma.Web.Endpoint.MetricsExporter,
+  enabled: true,
+  auth: {:basic, System.fetch_env!("METRICS_USER"), System.fetch_env!("METRICS_PASSWORD")},
+  ip_whitelist: [],
+  path: "/api/pleroma/app_metrics",
+  format: :text
