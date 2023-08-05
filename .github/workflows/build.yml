@@ -47,6 +47,7 @@ jobs:
         otp-version: '24.0' # Define the OTP version [required]
     - name: Install packages
       run: |
+        sudo apt-get update
         sudo apt-get install -y libimage-exiftool-perl ffmpeg
     - name: Restore dependencies cache
       uses: actions/cache@v3
