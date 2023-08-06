@@ -52,6 +52,7 @@ RUN mkdir -p ${DATA}/uploads &&\
 
 COPY --from=builder --chown=nobody:root /var/opt/app/release ${HOME}
 COPY --chown=nobody:root ./priv/static/emoji/custom ${DATA}/static/emoji/custom
+COPY --chown=nobody:root ./config/prod.secret.exs /etc/pleroma/config.exs
 
 WORKDIR ${HOME}
 
