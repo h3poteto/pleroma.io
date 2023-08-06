@@ -13,7 +13,6 @@ defmodule Mix.Tasks.Pleroma.User do
 
   @shortdoc "Manages Pleroma users"
   @moduledoc File.read!("docs/administration/CLI_tasks/user.md")
-  @requirements ["app.start"]
 
   def run(["new", nickname, email | rest]) do
     {options, [], []} =
@@ -62,6 +61,8 @@ defmodule Mix.Tasks.Pleroma.User do
     proceed? = assume_yes? or shell_prompt("Continue?", "n") in ~w(Yn Y y)
 
     if proceed? do
+      start_pleroma()
+
       params = %{
         nickname: nickname,
         email: email,
@@ -93,6 +94,8 @@ defmodule Mix.Tasks.Pleroma.User do
   end
 
   def run(["rm", nickname]) do
+    start_pleroma()
+
     with %User{local: true} = user <- User.get_cached_by_nickname(nickname),
          {:ok, delete_data, _} <- Builder.delete(user, user.ap_id),
          {:ok, _delete, _} <- Pipeline.common_pipeline(delete_data, local: true) do
@@ -103,6 +106,8 @@ defmodule Mix.Tasks.Pleroma.User do
   end
 
   def run(["reset_password", nickname]) do
+    start_pleroma()
+
     with %User{local: true} = user <- User.get_cached_by_nickname(nickname),
          {:ok, token} <- Pleroma.PasswordResetToken.create_token(user) do
       shell_info("Generated password reset token for #{user.nickname}")
@@ -118,6 +123,8 @@ defmodule Mix.Tasks.Pleroma.User do
   end
 
   def run(["reset_mfa", nickname]) do
+    start_pleroma()
+
     with %User{local: true} = user <- User.get_cached_by_nickname(nickname),
          {:ok, _token} <- Pleroma.MFA.disable(user) do
       shell_info("Multi-Factor Authentication disabled for #{user.nickname}")
@@ -128,6 +135,8 @@ defmodule Mix.Tasks.Pleroma.User do
   end
 
   def run(["activate", nickname]) do
+    start_pleroma()
+
     with %User{} = user <- User.get_cached_by_nickname(nickname),
          false <- user.is_active do
       User.set_activation(user, true)
@@ -144,6 +153,8 @@ defmodule Mix.Tasks.Pleroma.User do
   end
 
   def run(["deactivate", nickname]) do
+    start_pleroma()
+
     with %User{} = user <- User.get_cached_by_nickname(nickname),
          true <- user.is_active do
       User.set_activation(user, false)
@@ -164,6 +175,8 @@ defmodule Mix.Tasks.Pleroma.User do
   end
 
   def run(["deactivate_all_from_instance", instance]) do
+    start_pleroma()
+
     Pleroma.User.Query.build(%{nickname: "@#{instance}"})
     |> Pleroma.Repo.chunk_stream(500, :batches)
     |> Stream.each(fn users ->
@@ -176,6 +189,8 @@ defmodule Mix.Tasks.Pleroma.User do
   end
 
   def run(["set", nickname | rest]) do
+    start_pleroma()
+
     {options, [], []} =
       OptionParser.parse(
         rest,
@@ -218,6 +233,8 @@ defmodule Mix.Tasks.Pleroma.User do
   end
 
   def run(["tag", nickname | tags]) do
+    start_pleroma()
+
     with %User{} = user <- User.get_cached_by_nickname(nickname) do
       user = user |> User.tag(tags)
 
@@ -229,6 +246,8 @@ defmodule Mix.Tasks.Pleroma.User do
   end
 
   def run(["untag", nickname | tags]) do
+    start_pleroma()
+
     with %User{} = user <- User.get_cached_by_nickname(nickname) do
       user = user |> User.untag(tags)
 
@@ -256,6 +275,8 @@ defmodule Mix.Tasks.Pleroma.User do
       end)
       |> Enum.into(%{})
 
+    start_pleroma()
+
     with {:ok, val} <- options[:expires_at],
          options = Map.put(options, :expires_at, val),
          {:ok, invite} <- UserInviteToken.create_invite(options) do
@@ -276,6 +297,8 @@ defmodule Mix.Tasks.Pleroma.User do
   end
 
   def run(["invites"]) do
+    start_pleroma()
+
     shell_info("Invites list:")
 
     UserInviteToken.list_invites()
@@ -297,6 +320,8 @@ defmodule Mix.Tasks.Pleroma.User do
   end
 
   def run(["revoke_invite", token]) do
+    start_pleroma()
+
     with {:ok, invite} <- UserInviteToken.find_by_token(token),
          {:ok, _} <- UserInviteToken.update_invite(invite, %{used: true}) do
       shell_info("Invite for token #{token} was revoked.")
@@ -306,6 +331,8 @@ defmodule Mix.Tasks.Pleroma.User do
   end
 
   def run(["delete_activities", nickname]) do
+    start_pleroma()
+
     with %User{local: true} = user <- User.get_cached_by_nickname(nickname) do
       User.delete_user_activities(user)
       shell_info("User #{nickname} statuses deleted.")
@@ -316,6 +343,8 @@ defmodule Mix.Tasks.Pleroma.User do
   end
 
   def run(["confirm", nickname]) do
+    start_pleroma()
+
     with %User{} = user <- User.get_cached_by_nickname(nickname) do
       {:ok, user} = User.confirm(user)
 
@@ -329,6 +358,8 @@ defmodule Mix.Tasks.Pleroma.User do
   end
 
   def run(["confirm_all"]) do
+    start_pleroma()
+
     Pleroma.User.Query.build(%{
       local: true,
       is_active: true,
@@ -345,6 +376,8 @@ defmodule Mix.Tasks.Pleroma.User do
   end
 
   def run(["unconfirm_all"]) do
+    start_pleroma()
+
     Pleroma.User.Query.build(%{
       local: true,
       is_active: true,
@@ -361,6 +394,8 @@ defmodule Mix.Tasks.Pleroma.User do
   end
 
   def run(["sign_out", nickname]) do
+    start_pleroma()
+
     with %User{local: true} = user <- User.get_cached_by_nickname(nickname) do
       User.global_sign_out(user)
 
@@ -372,6 +407,8 @@ defmodule Mix.Tasks.Pleroma.User do
   end
 
   def run(["list"]) do
+    start_pleroma()
+
     Pleroma.User.Query.build(%{local: true})
     |> Pleroma.Repo.chunk_stream(500, :batches)
     |> Stream.each(fn users ->
