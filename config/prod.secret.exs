@@ -18,6 +18,8 @@ config :pleroma, :instance,
   dynamic_configuration: false,
   remote_post_retention_days: 90
 
+config :pleroma, :instance, static_dir: "/var/lib/pleroma/static"
+
 config :ex_aws,
   # We have to set dummy profile to use web identity adapter.
   # So this profile does not exist and don't prepare it.
