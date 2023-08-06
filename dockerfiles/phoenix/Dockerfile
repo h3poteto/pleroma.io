@@ -1,4 +1,4 @@
-FROM ghcr.io/h3poteto/pleroma:1.13.4-slim-buster
+FROM ghcr.io/h3poteto/pleroma:1.14.5-otp24-slim
 
 USER root
 ENV APP_DIR /var/opt/app
