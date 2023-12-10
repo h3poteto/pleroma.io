@@ -15,13 +15,15 @@ jobs:
     name: Build and test
     runs-on: ubuntu-latest
 
-    env:
-      MIX_ENV: test
-      DB_HOST: 127.0.0.1
-      DB_USER: pleroma
-      DB_PASSWORD: pleroma
-      DB_NAME: pleroma_test
-
+    container:
+      image: ghcr.io/h3poteto/pleroma:1.14.5-otp24-slim
+      options: --user root
+      env:
+        MIX_ENV: test
+        DB_HOST: postgres
+        DB_USER: pleroma
+        DB_PASSWORD: pleroma
+        DB_NAME: pleroma_test
     services:
       postgres:
         image: postgres:13
@@ -40,23 +42,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-    - name: Set up Elixir
-      uses: erlef/setup-beam@v1
-      with:
-        elixir-version: '1.14.5'
-        otp-version: '24.2' # Define the OTP version [required]
-    - name: Install packages
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libimage-exiftool-perl ffmpeg
-    - name: Restore dependencies cache
-      uses: actions/cache@v3
-      with:
-        path: |
-          deps
-          _build
-        key: ${{ runner.os }}-mix-${{ hashFiles('**/mix.lock') }}
-        restore-keys: ${{ runner.os }}-mix-
     - name: Install dependencies
       run: |
         mix local.hex --force
