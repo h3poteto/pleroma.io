@@ -29,3 +29,18 @@ config :pleroma, :frontend_configurations,
     showInstanceSpecificPanel: true,
     scopeOptionsEnabled: false
   }
+
+config :pleroma, :mrf,
+  policies: [
+    Pleroma.Web.ActivityPub.MRF.ObjectAgePolicy,
+    Pleroma.Web.ActivityPub.MRF.TagPolicy,
+    Pleroma.Web.ActivityPub.MRF.InlineQuotePolicy,
+    Pleroma.Web.ActivityPub.MRF.AntiLinkSpamPolicy,
+    Pleroma.Web.ActivityPub.MRF.HellthreadPolicy
+  ],
+  transparency: true,
+  transparency_exclusions: []
+
+config :pleroma, :mrf_hellthread,
+  delist_threshold: 4,
+  reject_threshold: 8
