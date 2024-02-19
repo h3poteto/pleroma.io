@@ -43,4 +43,4 @@ config :pleroma, :mrf,
 
 config :pleroma, :mrf_hellthread,
   delist_threshold: 4,
-  reject_threshold: 8
+  reject_threshold: 4
