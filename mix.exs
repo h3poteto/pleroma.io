@@ -4,7 +4,7 @@ defmodule Pleroma.Mixfile do
   def project do
     [
       app: :pleroma,
-      version: version("2.6.0"),
+      version: version("2.6.2"),
       elixir: "~> 1.11",
       elixirc_paths: elixirc_paths(Mix.env()),
       compilers: [:phoenix] ++ Mix.compilers(),
@@ -189,11 +189,13 @@ defmodule Pleroma.Mixfile do
        ref: "b647d0deecaa3acb140854fe4bda5b7e1dc6d1c8"},
       {:captcha,
        git: "https://git.pleroma.social/pleroma/elixir-libraries/elixir-captcha.git",
-       ref: "e0f16822d578866e186a0974d65ad58cddc1e2ab"},
+       ref: "90f6ce7672f70f56708792a98d98bd05176c9176"},
       {:rollbax, github: "ForzaElixir/rollbax"},
       {:restarter, path: "./restarter"},
       {:majic, "~> 1.0"},
-      {:eblurhash, "~> 1.2.2"},
+      {:eblurhash,
+       git: "https://github.com/zotonic/eblurhash.git",
+       ref: "bc37ceb426ef021ee9927fb249bb93f7059194ab"},
       {:open_api_spex, "~> 3.16"},
       {:ecto_psql_extras, "~> 0.6"},
 
