@@ -26,7 +26,7 @@ jobs:
         DB_NAME: pleroma_test
     services:
       postgres:
-        image: postgres:13
+        image: postgres:14
         env:
           POSTGRES_USER: pleroma
           POSTGRES_PASSWORD: pleroma
