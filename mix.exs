@@ -35,7 +35,12 @@ defmodule Pleroma.Mixfile do
       releases: [
         pleroma: [
           include_executables_for: [:unix],
-          applications: [ex_syslogger: :load, syslog: :load, eldap: :transient],
+          applications: [
+            ex_syslogger: :load,
+            syslog: :load,
+            eldap: :transient,
+            opentelemetry: :temporary
+          ],
           steps: [:assemble, &put_otp_version/1, &copy_files/1, &copy_nginx_config/1],
           config_providers: [{Pleroma.Config.ReleaseRuntimeProvider, []}]
         ]
@@ -139,7 +144,7 @@ defmodule Pleroma.Mixfile do
       {:castore, "~> 0.1"},
       {:cowlib, "~> 2.9", override: true},
       {:gun, "~> 2.0.0-rc.1", override: true},
-      {:finch, "~> 0.10.0"},
+      {:finch, "~> 0.15"},
       {:jason, "~> 1.2"},
       {:mogrify, "~> 0.9.1"},
       {:ex_aws, "~> 2.1.6"},
@@ -198,6 +203,14 @@ defmodule Pleroma.Mixfile do
        ref: "bc37ceb426ef021ee9927fb249bb93f7059194ab"},
       {:open_api_spex, "~> 3.16"},
       {:ecto_psql_extras, "~> 0.6"},
+
+      # open telemetry
+      {:opentelemetry, "~> 1.4.0"},
+      {:opentelemetry_phoenix, "~> 1.2"},
+      {:opentelemetry_cowboy, "~> 0.3.0"},
+      {:opentelemetry_exporter, "~> 1.7.0"},
+      {:opentelemetry_ecto, "~> 1.2.0"},
+      {:opentelemetry_oban, "~> 1.0"},
 
       ## dev & test
       {:ex_doc, "~> 0.22", only: :dev, runtime: false},

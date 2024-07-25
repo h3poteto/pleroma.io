@@ -59,6 +59,11 @@ defmodule Pleroma.Application do
     Pleroma.Docs.JSON.compile()
     limiters_setup()
 
+    :opentelemetry_cowboy.setup()
+    OpentelemetryPhoenix.setup(adapter: :cowboy2)
+    OpentelemetryEcto.setup([:pleroma, :repo], [{:db_statement, :enabled}])
+    OpentelemetryOban.setup()
+
     adapter = Application.get_env(:tesla, :adapter)
 
     if match?({Tesla.Adapter.Finch, _}, adapter) do
