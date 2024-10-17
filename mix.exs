@@ -213,12 +213,12 @@ defmodule Pleroma.Mixfile do
       {:oban_live_dashboard, "~> 0.1.1"},
 
       # open telemetry
-      {:opentelemetry, "~> 1.4.0"},
+      {:opentelemetry, "~> 1.5.0"},
       {:opentelemetry_phoenix, "~> 1.2"},
       {:opentelemetry_cowboy, "~> 0.3.0"},
-      {:opentelemetry_exporter, "~> 1.7.0"},
+      {:opentelemetry_exporter, "~> 1.8.0"},
       {:opentelemetry_ecto, "~> 1.2.0"},
-      {:opentelemetry_oban, "~> 1.0"},
+      {:opentelemetry_oban, "~> 1.1"},
 
       ## dev & test
       {:phoenix_live_reload, "~> 1.3.3", only: :dev},
