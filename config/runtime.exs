@@ -6,6 +6,7 @@ if config_env() == :prod do
   config :pleroma, Pleroma.Web.Endpoint,
     http: [ip: {0, 0, 0, 0}, port: 4000],
     url: [host: "pleroma.io", scheme: "https", port: 443],
+    check_origin: false,
     secret_key_base: System.fetch_env!("SECRET_KEY_BASE")
 
   config :pleroma, Pleroma.Uploaders.S3,
