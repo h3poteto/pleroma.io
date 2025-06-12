@@ -131,16 +131,14 @@ defmodule Pleroma.Telemetry do
   end
 
   def count_oban_job_queue do
-    if Pleroma.Config.get(:env) != :test do
-      query =
-        Oban.Job |> select([j], %{queue: j.queue, count: count(j.id)}) |> group_by([j], j.queue)
+    query =
+      Oban.Job |> select([j], %{queue: j.queue, count: count(j.id)}) |> group_by([j], j.queue)
 
-      Oban
-      |> Oban.config()
-      |> Oban.Repo.all(query)
-      |> Enum.each(fn %{count: count, queue: queue} ->
-        :telemetry.execute([:oban, :queue], %{length: count}, %{queue: queue})
-      end)
-    end
+    Oban
+    |> Oban.config()
+    |> Oban.Repo.all(query)
+    |> Enum.each(fn %{count: count, queue: queue} ->
+      :telemetry.execute([:oban, :queue], %{length: count}, %{queue: queue})
+    end)
   end
 end
