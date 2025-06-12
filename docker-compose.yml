@@ -16,6 +16,7 @@ services:
       - build:/var/opt/app/_build
     ports:
       - "4000:4000"
+      - "9568:9568" # prometheus
     links:
       - db:db
 

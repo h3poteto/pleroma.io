@@ -224,6 +224,8 @@ defmodule Pleroma.Mixfile do
       {:opentelemetry_exporter, "~> 1.8.0"},
       {:opentelemetry_ecto, "~> 1.2.0"},
       {:opentelemetry_oban, "~> 1.1"},
+      # telemetry
+      {:telemetry_metrics_prometheus, "~> 1.0"},
 
       ## dev & test
       {:phoenix_live_reload, "~> 1.3.3", only: :dev},
