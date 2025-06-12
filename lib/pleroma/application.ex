@@ -104,8 +104,7 @@ defmodule Pleroma.Application do
         Config.TransferTask,
         Pleroma.Emoji,
         Pleroma.Web.Plugs.RateLimiter.Supervisor,
-        {Task.Supervisor, name: Pleroma.TaskSupervisor},
-        Pleroma.Telemetry
+        {Task.Supervisor, name: Pleroma.TaskSupervisor}
       ] ++
         cachex_children() ++
         http_children(adapter) ++
@@ -121,7 +120,8 @@ defmodule Pleroma.Application do
         background_migrators() ++
         shout_child(shout_enabled?()) ++
         [Pleroma.Gopher.Server] ++
-        [Pleroma.Search.Healthcheck]
+        [Pleroma.Search.Healthcheck] ++
+        [Pleroma.Telemetry]
 
     # See http://elixir-lang.org/docs/stable/elixir/Supervisor.html
     # for other strategies and supported options
