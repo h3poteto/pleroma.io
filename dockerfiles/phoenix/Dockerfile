@@ -1,7 +1,4 @@
-ARG ELIXIR_VERSION=1.14.5
-ARG OTP_VERSION=24.2.1
-
-FROM ghcr.io/h3poteto/pleroma:1.14.5-otp24-slim as builder
+FROM ghcr.io/h3poteto/pleroma:1.15.1-otp26-slim as builder
 
 USER root
 ENV APP_DIR /var/opt/app
