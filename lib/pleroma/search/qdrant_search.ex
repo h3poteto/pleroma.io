@@ -157,26 +157,55 @@ defmodule Pleroma.Search.QdrantSearch do
 end
 
 defmodule Pleroma.Search.QdrantSearch.OpenAIClient do
-  use Tesla
   alias Pleroma.Config.Getting, as: Config
 
-  plug(Tesla.Middleware.BaseUrl, Config.get([Pleroma.Search.QdrantSearch, :openai_url]))
-  plug(Tesla.Middleware.JSON)
+  def post(path, body) do
+    Tesla.post(client(), path, body)
+  end
 
-  plug(Tesla.Middleware.Headers, [
-    {"Authorization",
-     "Bearer #{Pleroma.Config.get([Pleroma.Search.QdrantSearch, :openai_api_key])}"}
-  ])
+  defp client do
+    Tesla.client(middleware())
+  end
+
+  defp middleware do
+    [
+      {Tesla.Middleware.BaseUrl, Config.get([Pleroma.Search.QdrantSearch, :openai_url])},
+      Tesla.Middleware.JSON,
+      {Tesla.Middleware.Headers,
+       [
+         {"Authorization", "Bearer #{Config.get([Pleroma.Search.QdrantSearch, :openai_api_key])}"}
+       ]}
+    ]
+  end
 end
 
 defmodule Pleroma.Search.QdrantSearch.QdrantClient do
-  use Tesla
   alias Pleroma.Config.Getting, as: Config
 
-  plug(Tesla.Middleware.BaseUrl, Config.get([Pleroma.Search.QdrantSearch, :qdrant_url]))
-  plug(Tesla.Middleware.JSON)
+  def delete(path) do
+    Tesla.delete(client(), path)
+  end
 
-  plug(Tesla.Middleware.Headers, [
-    {"api-key", Pleroma.Config.get([Pleroma.Search.QdrantSearch, :qdrant_api_key])}
-  ])
+  def post(path, body) do
+    Tesla.post(client(), path, body)
+  end
+
+  def put(path, body) do
+    Tesla.put(client(), path, body)
+  end
+
+  defp client do
+    Tesla.client(middleware())
+  end
+
+  defp middleware do
+    [
+      {Tesla.Middleware.BaseUrl, Config.get([Pleroma.Search.QdrantSearch, :qdrant_url])},
+      Tesla.Middleware.JSON,
+      {Tesla.Middleware.Headers,
+       [
+         {"api-key", Pleroma.Config.get([Pleroma.Search.QdrantSearch, :qdrant_api_key])}
+       ]}
+    ]
+  end
 end

@@ -46,7 +46,7 @@ defmodule Pleroma.Web.InstanceDocument do
 
   defp put_file(origin_path, destination_path) do
     with destination <- instance_static_dir(destination_path),
-         {_, :ok} <- {:mkdir_p, File.mkdir_p(Path.dirname(destination))},
+         {_, :ok} <- {:mkdir_p, Pleroma.Backports.mkdir_p(Path.dirname(destination))},
          {_, {:ok, _}} <- {:copy, File.copy(origin_path, destination)} do
       :ok
     else

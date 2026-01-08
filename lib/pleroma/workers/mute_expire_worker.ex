@@ -5,9 +5,13 @@
 defmodule Pleroma.Workers.MuteExpireWorker do
   use Oban.Worker, queue: :background
 
+  alias Pleroma.User
+
   @impl true
-  def perform(%Job{args: %{"op" => "unmute_user", "muter_id" => muter_id, "mutee_id" => mutee_id}}) do
-    Pleroma.User.unmute(muter_id, mutee_id)
+  def perform(%Job{
+        args: %{"op" => "unmute_user", "muter_id" => muter_id, "mutee_id" => mutee_id}
+      }) do
+    User.unmute(muter_id, mutee_id)
     :ok
   end
 
@@ -15,6 +19,17 @@ defmodule Pleroma.Workers.MuteExpireWorker do
         args: %{"op" => "unmute_conversation", "user_id" => user_id, "activity_id" => activity_id}
       }) do
     Pleroma.Web.CommonAPI.remove_mute(activity_id, user_id)
+    :ok
+  end
+
+  def perform(%Job{
+        args: %{"op" => "unblock_user", "blocker_id" => blocker_id, "blocked_id" => blocked_id}
+      }) do
+    Pleroma.Web.CommonAPI.unblock(
+      User.get_cached_by_id(blocked_id),
+      User.get_cached_by_id(blocker_id)
+    )
+
     :ok
   end
 

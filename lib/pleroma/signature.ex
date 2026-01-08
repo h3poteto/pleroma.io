@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 
 defmodule Pleroma.Signature do
+  @behaviour Pleroma.Signature.API
   @behaviour HTTPSignatures.Adapter
 
   alias Pleroma.EctoType.ActivityPub.ObjectValidators
@@ -53,7 +54,7 @@ defmodule Pleroma.Signature do
 
   def fetch_public_key(conn) do
     with {:ok, actor_id} <- get_actor_id(conn),
-         {:ok, public_key} <- User.get_public_key_for_ap_id(actor_id) do
+         {:ok, public_key} <- User.get_or_fetch_public_key_for_ap_id(actor_id) do
       {:ok, public_key}
     else
       e ->

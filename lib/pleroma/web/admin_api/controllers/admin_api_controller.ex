@@ -240,6 +240,10 @@ defmodule Pleroma.Web.AdminAPI.AdminAPIController do
     render_error(conn, :not_found, "No such permission_group")
   end
 
+  def right_delete(%{assigns: %{user: %{nickname: nickname}}} = conn, %{"nickname" => nickname}) do
+    render_error(conn, :forbidden, "You can't revoke your own admin status.")
+  end
+
   def right_delete(
         %{assigns: %{user: admin}} = conn,
         %{
@@ -263,10 +267,6 @@ defmodule Pleroma.Web.AdminAPI.AdminAPIController do
     })
 
     json(conn, fields)
-  end
-
-  def right_delete(%{assigns: %{user: %{nickname: nickname}}} = conn, %{"nickname" => nickname}) do
-    render_error(conn, :forbidden, "You can't revoke your own admin status.")
   end
 
   @doc "Get a password reset token (base64 string) for given nickname"
@@ -335,13 +335,13 @@ defmodule Pleroma.Web.AdminAPI.AdminAPIController do
 
       if params["password"] do
         User.force_password_reset_async(user)
-      end
 
-      ModerationLog.insert_log(%{
-        actor: admin,
-        subject: [user],
-        action: "force_password_reset"
-      })
+        ModerationLog.insert_log(%{
+          actor: admin,
+          subject: [user],
+          action: "force_password_reset"
+        })
+      end
 
       json(conn, %{status: "success"})
     else

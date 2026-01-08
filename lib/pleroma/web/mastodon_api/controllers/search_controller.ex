@@ -5,6 +5,7 @@
 defmodule Pleroma.Web.MastodonAPI.SearchController do
   use Pleroma.Web, :controller
 
+  alias Pleroma.Hashtag
   alias Pleroma.Repo
   alias Pleroma.User
   alias Pleroma.Web.ControllerHelper
@@ -90,6 +91,7 @@ defmodule Pleroma.Web.MastodonAPI.SearchController do
       limit: min(params[:limit], @search_limit),
       offset: params[:offset],
       type: params[:type],
+      capabilities: params[:capabilities],
       author: get_author(params),
       embed_relationships: ControllerHelper.embed_relationships?(params),
       for_user: user
@@ -120,69 +122,14 @@ defmodule Pleroma.Web.MastodonAPI.SearchController do
   defp resource_search(:v2, "hashtags", query, options) do
     tags_path = Endpoint.url() <> "/tag/"
 
-    query
-    |> prepare_tags(options)
+    Hashtag.search(query, options)
     |> Enum.map(fn tag ->
       %{name: tag, url: tags_path <> tag}
     end)
   end
 
   defp resource_search(:v1, "hashtags", query, options) do
-    prepare_tags(query, options)
-  end
-
-  defp prepare_tags(query, options) do
-    tags =
-      query
-      |> preprocess_uri_query()
-      |> String.split(~r/[^#\w]+/u, trim: true)
-      |> Enum.uniq_by(&String.downcase/1)
-
-    explicit_tags = Enum.filter(tags, fn tag -> String.starts_with?(tag, "#") end)
-
-    tags =
-      if Enum.any?(explicit_tags) do
-        explicit_tags
-      else
-        tags
-      end
-
-    tags = Enum.map(tags, fn tag -> String.trim_leading(tag, "#") end)
-
-    tags =
-      if Enum.empty?(explicit_tags) && !options[:skip_joined_tag] do
-        add_joined_tag(tags)
-      else
-        tags
-      end
-
-    Pleroma.Pagination.paginate_list(tags, options)
-  end
-
-  defp add_joined_tag(tags) do
-    tags
-    |> Kernel.++([joined_tag(tags)])
-    |> Enum.uniq_by(&String.downcase/1)
-  end
-
-  # If `query` is a URI, returns last component of its path, otherwise returns `query`
-  defp preprocess_uri_query(query) do
-    if query =~ ~r/https?:\/\// do
-      query
-      |> String.trim_trailing("/")
-      |> URI.parse()
-      |> Map.get(:path)
-      |> String.split("/")
-      |> Enum.at(-1)
-    else
-      query
-    end
-  end
-
-  defp joined_tag(tags) do
-    tags
-    |> Enum.map(fn tag -> String.capitalize(tag) end)
-    |> Enum.join()
+    Hashtag.search(query, options)
   end
 
   defp with_fallback(f, fallback \\ []) do
@@ -190,7 +137,7 @@ defmodule Pleroma.Web.MastodonAPI.SearchController do
       f.()
     rescue
       error ->
-        Logger.error("#{__MODULE__} search error: #{inspect(error)}")
+        Logger.error(Exception.format(:error, error, __STACKTRACE__))
         fallback
     end
   end

@@ -24,4 +24,6 @@ command=/usr/local/bin/elixir
 command_args="--erl \"-detached\" -S /usr/local/bin/mix phx.server"
 procname="*beam.smp"
 
+PATH="${PATH}:/usr/local/sbin:/usr/local/bin"
+
 run_rc_command "$1"

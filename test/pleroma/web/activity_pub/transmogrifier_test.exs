@@ -9,7 +9,10 @@ defmodule Pleroma.Web.ActivityPub.TransmogrifierTest do
   alias Pleroma.Activity
   alias Pleroma.Object
   alias Pleroma.User
+  alias Pleroma.Web.ActivityPub.Builder
+  alias Pleroma.Web.ActivityPub.Pipeline
   alias Pleroma.Web.ActivityPub.Transmogrifier
+  alias Pleroma.Web.ActivityPub.UserView
   alias Pleroma.Web.ActivityPub.Utils
   alias Pleroma.Web.AdminAPI.AccountView
   alias Pleroma.Web.CommonAPI
@@ -121,6 +124,30 @@ defmodule Pleroma.Web.ActivityPub.TransmogrifierTest do
       object = Object.normalize(activity, fetch: false)
 
       assert activity.data["context"] == object.data["context"]
+    end
+
+    test "it fixes the public scope addressing" do
+      insert(:user,
+        ap_id: "https://mymath.rocks/endpoints/SYn3cl_N4HAPfPHgo2x37XunLEmhV9LnxCggcYwyec0"
+      )
+
+      object =
+        "test/fixtures/bovine-bogus-public-note.json"
+        |> File.read!()
+        |> Jason.decode!()
+
+      message = %{
+        "@context" => "https://www.w3.org/ns/activitystreams",
+        "type" => "Create",
+        "actor" => "https://mymath.rocks/endpoints/SYn3cl_N4HAPfPHgo2x37XunLEmhV9LnxCggcYwyec0",
+        "object" => object
+      }
+
+      assert {:ok, activity} = Transmogrifier.handle_incoming(message)
+
+      object = Object.normalize(activity, fetch: false)
+      assert "https://www.w3.org/ns/activitystreams#Public" in activity.data["to"]
+      assert "https://www.w3.org/ns/activitystreams#Public" in object.data["to"]
     end
 
     test "it keeps link tags" do
@@ -506,6 +533,9 @@ defmodule Pleroma.Web.ActivityPub.TransmogrifierTest do
       assert is_nil(modified["object"]["announcements"])
       assert is_nil(modified["object"]["announcement_count"])
       assert is_nil(modified["object"]["generator"])
+      assert is_nil(modified["object"]["rules"])
+      assert is_nil(modified["object"]["language"])
+      assert is_nil(modified["object"]["voters"])
     end
 
     test "it strips internal fields of article" do
@@ -563,6 +593,7 @@ defmodule Pleroma.Web.ActivityPub.TransmogrifierTest do
     test "it can handle Listen activities" do
       listen_activity = insert(:listen)
 
+      # This has an inlined object as in ObjectView
       {:ok, modified} = Transmogrifier.prepare_outgoing(listen_activity.data)
 
       assert modified["type"] == "Listen"
@@ -571,7 +602,36 @@ defmodule Pleroma.Web.ActivityPub.TransmogrifierTest do
 
       {:ok, activity} = CommonAPI.listen(user, %{"title" => "lain radio episode 1"})
 
-      {:ok, _modified} = Transmogrifier.prepare_outgoing(activity.data)
+      user_ap_id = user.ap_id
+      activity_ap_id = activity.data["id"]
+      activity_to = activity.data["to"]
+      activity_cc = activity.data["cc"]
+      object_ap_id = activity.data["object"]
+      object_type = activity.object.data["type"]
+
+      # This does not have an inlined object
+      {:ok, modified2} = Transmogrifier.prepare_outgoing(activity.data)
+
+      assert match?(
+               %{
+                 "@context" => [_ | _],
+                 "type" => "Listen",
+                 "actor" => ^user_ap_id,
+                 "to" => ^activity_to,
+                 "cc" => ^activity_cc,
+                 "context" => "http://localhost" <> _,
+                 "id" => ^activity_ap_id,
+                 "object" => %{
+                   "actor" => ^user_ap_id,
+                   "attributedTo" => ^user_ap_id,
+                   "id" => ^object_ap_id,
+                   "type" => ^object_type,
+                   "to" => ^activity_to,
+                   "cc" => ^activity_cc
+                 }
+               },
+               modified2
+             )
     end
 
     test "custom emoji urls are URI encoded" do
@@ -611,11 +671,99 @@ defmodule Pleroma.Web.ActivityPub.TransmogrifierTest do
              } = prepared["object"]
     end
 
+    test "Updates of Actors are handled" do
+      user = insert(:user, local: true)
+
+      changeset = User.update_changeset(user, %{name: "new name"})
+      {:ok, unpersisted_user} = Ecto.Changeset.apply_action(changeset, :update)
+
+      updated_object =
+        UserView.render("user.json", user: unpersisted_user)
+        |> Map.delete("@context")
+
+      {:ok, update_data, []} = Builder.update(user, updated_object)
+
+      {:ok, activity, _} =
+        Pipeline.common_pipeline(update_data,
+          local: true,
+          user_update_changeset: changeset
+        )
+
+      assert {:ok, prepared} = Transmogrifier.prepare_outgoing(activity.data)
+      assert prepared["type"] == "Update"
+      assert prepared["@context"]
+      assert prepared["object"]["type"] == user.actor_type
+    end
+
+    test "Correctly handles Undo activities" do
+      blocked = insert(:user)
+      blocker = insert(:user, local: true)
+
+      blocked_ap_id = blocked.ap_id
+      blocker_ap_id = blocker.ap_id
+
+      {:ok, %Activity{} = block_activity} = CommonAPI.block(blocked, blocker)
+      {:ok, %Activity{} = undo_activity} = CommonAPI.unblock(blocked, blocker)
+      {:ok, data} = Transmogrifier.prepare_outgoing(undo_activity.data)
+
+      block_ap_id = block_activity.data["id"]
+      assert is_binary(block_ap_id)
+
+      assert match?(
+               %{
+                 "@context" => [_ | _],
+                 "type" => "Undo",
+                 "id" => "http://localhost" <> _,
+                 "actor" => ^blocker_ap_id,
+                 "object" => ^block_ap_id,
+                 "to" => [^blocked_ap_id],
+                 "cc" => [],
+                 "bto" => [],
+                 "bcc" => []
+               },
+               data
+             )
+    end
+
+    test "Correctly handles EmojiReact activities" do
+      user = insert(:user, local: true)
+      note_activity = insert(:note_activity)
+
+      user_ap_id = user.ap_id
+      user_followers = user.follower_address
+      note_author = note_activity.data["actor"]
+      note_ap_id = note_activity.data["object"]
+
+      assert is_binary(note_author)
+      assert is_binary(note_ap_id)
+
+      {:ok, react_activity} = CommonAPI.react_with_emoji(note_activity.id, user, "🐈")
+      {:ok, data} = Transmogrifier.prepare_outgoing(react_activity.data)
+
+      assert match?(
+               %{
+                 "@context" => [_ | _],
+                 "type" => "EmojiReact",
+                 "actor" => ^user_ap_id,
+                 "to" => [^user_followers, ^note_author],
+                 "cc" => ["https://www.w3.org/ns/activitystreams#Public"],
+                 "bto" => [],
+                 "bcc" => [],
+                 "content" => "🐈",
+                 "context" => "2hu",
+                 "id" => "http://localhost" <> _,
+                 "object" => ^note_ap_id,
+                 "tag" => []
+               },
+               data
+             )
+    end
+
     test "it prepares a quote post" do
       user = insert(:user)
 
       {:ok, quoted_post} = CommonAPI.post(user, %{status: "hey"})
-      {:ok, quote_post} = CommonAPI.post(user, %{status: "hey", quote_id: quoted_post.id})
+      {:ok, quote_post} = CommonAPI.post(user, %{status: "hey", quoted_status_id: quoted_post.id})
 
       {:ok, modified} = Transmogrifier.prepare_outgoing(quote_post.data)
 
@@ -641,6 +789,69 @@ defmodule Pleroma.Web.ActivityPub.TransmogrifierTest do
       {:ok, modified} = Transmogrifier.prepare_outgoing(activity.data)
 
       assert [_, _, %{"@language" => "pl"}] = modified["@context"]
+    end
+
+    test "it strips report data" do
+      reporter = insert(:user)
+      target_account = insert(:user)
+      content = "foobar"
+      {:ok, reported_activity} = CommonAPI.post(target_account, %{status: content})
+      context = Utils.generate_context_id()
+
+      object_ap_id = reported_activity.object.data["id"]
+
+      assert {:ok, activity} =
+               Pleroma.Web.ActivityPub.ActivityPub.flag(%{
+                 actor: reporter,
+                 context: context,
+                 account: target_account,
+                 statuses: [reported_activity],
+                 content: content
+               })
+
+      {:ok, data} = Transmogrifier.prepare_outgoing(activity.data)
+
+      expected_data =
+        activity.data
+        |> put_in(["object"], [target_account.ap_id, object_ap_id])
+        |> Map.put("actor", reporter.ap_id)
+        |> Map.merge(Utils.make_json_ld_header())
+
+      assert data == expected_data
+    end
+
+    test "it strips report data and anonymize" do
+      placeholder = insert(:user)
+
+      reporter = insert(:user)
+      target_account = insert(:user)
+      content = "foobar"
+      {:ok, reported_activity} = CommonAPI.post(target_account, %{status: content})
+      context = Utils.generate_context_id()
+
+      object_ap_id = reported_activity.object.data["id"]
+
+      assert {:ok, activity} =
+               Pleroma.Web.ActivityPub.ActivityPub.flag(%{
+                 actor: reporter,
+                 context: context,
+                 account: target_account,
+                 statuses: [reported_activity],
+                 content: content
+               })
+
+      clear_config([:activitypub, :anonymize_reporter], true)
+      clear_config([:activitypub, :anonymize_reporter_local_nickname], placeholder.nickname)
+
+      {:ok, data} = Transmogrifier.prepare_outgoing(activity.data)
+
+      expected_data =
+        activity.data
+        |> put_in(["object"], [target_account.ap_id, object_ap_id])
+        |> Map.put("actor", placeholder.ap_id)
+        |> Map.merge(Utils.make_json_ld_header())
+
+      assert data == expected_data
     end
   end
 

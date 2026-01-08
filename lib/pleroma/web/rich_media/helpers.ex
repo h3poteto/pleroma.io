@@ -126,6 +126,11 @@ defmodule Pleroma.Web.RichMedia.Helpers do
   end
 
   defp req_headers do
-    [{"user-agent", Pleroma.Application.user_agent() <> "; Bot"}]
+    user_agent = Config.get([:rich_media, :user_agent], :default)
+
+    case user_agent do
+      :default -> [{"user-agent", Pleroma.Application.user_agent() <> "; Bot"}]
+      custom -> [{"user-agent", custom}]
+    end
   end
 end

@@ -109,4 +109,22 @@ defmodule Pleroma.Web.ActivityPub.MRF.InlineQuotePolicyTest do
     {:ok, filtered} = InlineQuotePolicy.filter(activity)
     assert filtered == activity
   end
+
+  # Mastodon uses p tags instead of span in their quote posts
+  # URLs in quoteUri and post content are already mismatched
+  test "skips objects which already have an .inline-quote p" do
+    object = File.read!("test/fixtures/quote_post/mastodon_quote_post.json") |> Jason.decode!()
+
+    # Normally the ObjectValidator will fix this before it reaches MRF
+    object = Map.put(object, "quoteUrl", object["quoteUri"])
+
+    activity = %{
+      "type" => "Create",
+      "actor" => "https://mastodon.social/users/gwynnion",
+      "object" => object
+    }
+
+    {:ok, filtered} = InlineQuotePolicy.filter(activity)
+    assert filtered == activity
+  end
 end

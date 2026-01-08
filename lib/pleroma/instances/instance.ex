@@ -9,7 +9,6 @@ defmodule Pleroma.Instances.Instance do
   alias Pleroma.Instances.Instance
   alias Pleroma.Maps
   alias Pleroma.Repo
-  alias Pleroma.User
   alias Pleroma.Workers.DeleteWorker
 
   use Ecto.Schema
@@ -51,7 +50,7 @@ defmodule Pleroma.Instances.Instance do
     |> cast(params, [:software_name, :software_version, :software_repository])
   end
 
-  def filter_reachable([]), do: %{}
+  def filter_reachable([]), do: []
 
   def filter_reachable(urls_or_hosts) when is_list(urls_or_hosts) do
     hosts =
@@ -68,19 +67,15 @@ defmodule Pleroma.Instances.Instance do
       )
       |> Map.new(& &1)
 
-    reachability_datetime_threshold = Instances.reachability_datetime_threshold()
-
     for entry <- Enum.filter(urls_or_hosts, &is_binary/1) do
       host = host(entry)
       unreachable_since = unreachable_since_by_host[host]
 
-      if !unreachable_since ||
-           NaiveDateTime.compare(unreachable_since, reachability_datetime_threshold) == :gt do
-        {entry, unreachable_since}
+      if is_nil(unreachable_since) do
+        entry
       end
     end
     |> Enum.filter(& &1)
-    |> Map.new(& &1)
   end
 
   def reachable?(url_or_host) when is_binary(url_or_host) do
@@ -88,7 +83,7 @@ defmodule Pleroma.Instances.Instance do
       from(i in Instance,
         where:
           i.host == ^host(url_or_host) and
-            i.unreachable_since <= ^Instances.reachability_datetime_threshold(),
+            not is_nil(i.unreachable_since),
         select: true
       )
     )
@@ -97,9 +92,16 @@ defmodule Pleroma.Instances.Instance do
   def reachable?(url_or_host) when is_binary(url_or_host), do: true
 
   def set_reachable(url_or_host) when is_binary(url_or_host) do
-    %Instance{host: host(url_or_host)}
-    |> changeset(%{unreachable_since: nil})
-    |> Repo.insert(on_conflict: {:replace, [:unreachable_since]}, conflict_target: :host)
+    host = host(url_or_host)
+
+    result =
+      %Instance{host: host}
+      |> changeset(%{unreachable_since: nil})
+      |> Repo.insert(on_conflict: {:replace, [:unreachable_since]}, conflict_target: :host)
+
+    Pleroma.Workers.ReachabilityWorker.delete_jobs_for_host(host)
+
+    result
   end
 
   def set_reachable(_), do: {:error, nil}
@@ -132,11 +134,9 @@ defmodule Pleroma.Instances.Instance do
 
   def set_unreachable(_, _), do: {:error, nil}
 
-  def get_consistently_unreachable do
-    reachability_datetime_threshold = Instances.reachability_datetime_threshold()
-
+  def get_unreachable do
     from(i in Instance,
-      where: ^reachability_datetime_threshold > i.unreachable_since,
+      where: not is_nil(i.unreachable_since),
       order_by: i.unreachable_since,
       select: {i.host, i.unreachable_since}
     )
@@ -296,20 +296,14 @@ defmodule Pleroma.Instances.Instance do
   Deletes all users from an instance in a background task, thus also deleting
   all of those users' activities and notifications.
   """
-  def delete_users_and_activities(host) when is_binary(host) do
+  def delete(host) when is_binary(host) do
     DeleteWorker.new(%{"op" => "delete_instance", "host" => host})
     |> Oban.insert()
   end
 
-  def perform(:delete_instance, host) when is_binary(host) do
-    User.Query.build(%{nickname: "@#{host}"})
-    |> Repo.chunk_stream(100, :batches)
-    |> Stream.each(fn users ->
-      users
-      |> Enum.each(fn user ->
-        User.perform(:delete, user)
-      end)
-    end)
-    |> Stream.run()
+  @doc "Schedules reachability check for instance"
+  def check_unreachable(domain) when is_binary(domain) do
+    Pleroma.Workers.ReachabilityWorker.new(%{"domain" => domain})
+    |> Oban.insert()
   end
 end

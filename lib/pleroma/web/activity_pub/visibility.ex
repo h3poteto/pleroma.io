@@ -73,6 +73,22 @@ defmodule Pleroma.Web.ActivityPub.Visibility do
       |> Pleroma.List.member?(user)
   end
 
+  def visible_for_user?(%Activity{object: %Object{} = object} = activity, nil) do
+    activity_visibility? = restrict_unauthenticated_access?(activity)
+    activity_public? = public?(activity) and not local_public?(activity)
+    object_visibility? = restrict_unauthenticated_access?(object)
+    object_public? = public?(object) and not local_public?(object)
+
+    # Activity could be local, but object might not (Announce/Like)
+    cond do
+      activity_visibility? or object_visibility? ->
+        false
+
+      true ->
+        activity_public? and object_public?
+    end
+  end
+
   def visible_for_user?(%{__struct__: module} = message, nil)
       when module in [Activity, Object] do
     if restrict_unauthenticated_access?(message),

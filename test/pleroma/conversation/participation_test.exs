@@ -332,7 +332,7 @@ defmodule Pleroma.Conversation.ParticipationTest do
       # When it's a reply from the blocked user
       {:ok, _direct2} =
         CommonAPI.post(blocked, %{
-          status: "reply",
+          status: "@#{third_user.nickname}, #{blocker.nickname} reply",
           visibility: "direct",
           in_reply_to_conversation_id: blocked_participation.id
         })

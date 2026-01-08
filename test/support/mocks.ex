@@ -34,5 +34,15 @@ Mox.defmock(Pleroma.LoggerMock, for: Pleroma.Logging)
 
 Mox.defmock(Pleroma.Uploaders.S3.ExAwsMock, for: Pleroma.Uploaders.S3.ExAwsAPI)
 
+Mox.defmock(Pleroma.Language.LanguageDetectorMock,
+  for: Pleroma.Language.LanguageDetector.Provider
+)
+
 Mox.defmock(Pleroma.DateTimeMock, for: Pleroma.DateTime)
 Mox.defmock(Pleroma.MogrifyMock, for: Pleroma.MogrifyBehaviour)
+
+Mox.defmock(Pleroma.SignatureMock, for: Pleroma.Signature.API)
+
+Mox.defmock(Pleroma.Web.ActivityPub.TransmogrifierMock,
+  for: Pleroma.Web.ActivityPub.Transmogrifier.API
+)

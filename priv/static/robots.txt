@@ -1,2 +1,8 @@
-User-Agent: *
+User-agent: *
+Disallow: /
+
+User-agent: FediIndex
+Allow: /nodeinfo/2.0
+Allow: /nodeinfo/2.1
+Allow: /nodeinfo/2.2
 Disallow: /

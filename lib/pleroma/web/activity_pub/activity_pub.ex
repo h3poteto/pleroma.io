@@ -414,10 +414,8 @@ defmodule Pleroma.Web.ActivityPub.ActivityPub do
 
     with flag_data <- make_flag_data(params, additional),
          {:ok, activity} <- insert(flag_data, local),
-         {:ok, stripped_activity} <- strip_report_status_data(activity),
          _ <- notify_and_stream(activity),
-         :ok <-
-           maybe_federate(stripped_activity) do
+         :ok <- maybe_federate(activity) do
       User.all_users_with_privilege(:reports_manage_reports)
       |> Enum.filter(fn user -> user.ap_id != actor end)
       |> Enum.filter(fn user -> not is_nil(user.email) end)
@@ -499,6 +497,28 @@ defmodule Pleroma.Web.ActivityPub.ActivityPub do
     context
     |> fetch_activities_for_context_query(opts)
     |> Repo.all()
+  end
+
+  def fetch_objects_for_replies_collection(parent_ap_id, opts \\ %{}) do
+    opts =
+      opts
+      |> Map.put(:order_asc, true)
+      |> Map.put(:id_type, :integer)
+
+    from(o in Object,
+      where:
+        fragment("?->>'inReplyTo' = ?", o.data, ^parent_ap_id) and
+          fragment(
+            "(?->'to' \\? ?::text OR ?->'cc' \\? ?::text)",
+            o.data,
+            ^Pleroma.Constants.as_public(),
+            o.data,
+            ^Pleroma.Constants.as_public()
+          ) and
+          fragment("?->>'type' <> 'Answer'", o.data),
+      select: %{id: o.id, ap_id: fragment("?->>'id'", o.data)}
+    )
+    |> Pagination.fetch_paginated(opts, :keyset)
   end
 
   @spec fetch_latest_direct_activity_id_for_context(String.t(), keyword() | map()) ::
@@ -1065,6 +1085,10 @@ defmodule Pleroma.Web.ActivityPub.ActivityPub do
     from(activity in query, where: fragment("?->>'type' != 'Announce'", activity.data))
   end
 
+  defp restrict_reblogs(query, %{only_reblogs: true}) do
+    from(activity in query, where: fragment("?->>'type' = 'Announce'", activity.data))
+  end
+
   defp restrict_reblogs(query, _), do: query
 
   defp restrict_muted(query, %{with_muted: true}), do: query
@@ -1567,12 +1591,19 @@ defmodule Pleroma.Web.ActivityPub.ActivityPub do
 
   defp get_actor_url(_url), do: nil
 
-  defp normalize_image(%{"url" => url} = data) do
+  defp normalize_image(%{"url" => url} = data) when is_binary(url) do
     %{
       "type" => "Image",
       "url" => [%{"href" => url}]
     }
     |> maybe_put_description(data)
+  end
+
+  defp normalize_image(%{"url" => urls}) when is_list(urls) do
+    url = urls |> List.first()
+
+    %{"url" => url}
+    |> normalize_image()
   end
 
   defp normalize_image(urls) when is_list(urls), do: urls |> List.first() |> normalize_image()

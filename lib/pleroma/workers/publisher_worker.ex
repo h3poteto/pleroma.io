@@ -4,9 +4,10 @@
 
 defmodule Pleroma.Workers.PublisherWorker do
   alias Pleroma.Activity
+  alias Pleroma.Instances
   alias Pleroma.Web.Federator
 
-  use Oban.Worker, queue: :federator_outgoing, max_attempts: 5
+  use Oban.Worker, queue: :federator_outgoing, max_attempts: 13
 
   @impl true
   def perform(%Job{args: %{"op" => "publish", "activity_id" => activity_id}}) do
@@ -14,9 +15,30 @@ defmodule Pleroma.Workers.PublisherWorker do
     Federator.perform(:publish, activity)
   end
 
-  def perform(%Job{args: %{"op" => "publish_one", "params" => params}}) do
+  def perform(%Job{args: %{"op" => "publish_one", "params" => params}} = job) do
     params = Map.new(params, fn {k, v} -> {String.to_atom(k), v} end)
-    Federator.perform(:publish_one, params)
+
+    # Cancel / skip the job if this server believed to be unreachable now
+    if not Instances.reachable?(params.inbox) do
+      {:cancel, :unreachable}
+    else
+      case Federator.perform(:publish_one, params) do
+        {:ok, _} ->
+          :ok
+
+        {:error, _} = error ->
+          # Only mark as unreachable on final failure
+          if job.attempt == job.max_attempts do
+            Instances.set_unreachable(params.inbox)
+          end
+
+          error
+
+        error ->
+          # Unexpected error, may have been client side
+          error
+      end
+    end
   end
 
   @impl true

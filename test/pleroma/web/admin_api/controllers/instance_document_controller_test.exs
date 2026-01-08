@@ -10,7 +10,7 @@ defmodule Pleroma.Web.AdminAPI.InstanceDocumentControllerTest do
   @default_instance_panel ~s(<p>Welcome to Pleroma.io. This is a <a href="https://pleroma.social" target="_blank">Pleroma</a> instance, federated with a larger microblogging network.</p>)
 
   setup do
-    File.mkdir_p!(@dir)
+    Pleroma.Backports.mkdir_p!(@dir)
     on_exit(fn -> File.rm_rf(@dir) end)
   end
 

@@ -18,6 +18,8 @@ defmodule Pleroma.Web.ActivityPub.MRF.InlineQuotePolicy do
       content =~ quote_url -> true
       # Does the content already have a .quote-inline span?
       content =~ "<span class=\"quote-inline\">" -> true
+      # Does the content already have a .quote-inline p? (Mastodon)
+      content =~ "<p class=\"quote-inline\">" -> true
       # No inline quote found
       true -> false
     end

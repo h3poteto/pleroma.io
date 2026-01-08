@@ -122,6 +122,10 @@ defmodule Pleroma.Web.Federator do
         Logger.debug("Unhandled actor #{actor}, #{inspect(e)}")
         {:error, e}
 
+      {:reject, reason} = e ->
+        Logger.debug("Rejected by MRF: #{inspect(reason)}")
+        {:error, e}
+
       e ->
         # Just drop those for now
         Logger.debug(fn -> "Unhandled activity\n" <> Jason.encode!(params, pretty: true) end)

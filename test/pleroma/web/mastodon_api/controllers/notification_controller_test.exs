@@ -316,6 +316,9 @@ defmodule Pleroma.Web.MastodonAPI.NotificationControllerTest do
       user = insert(:user)
       %{user: other_user, conn: conn} = oauth_access(["read:notifications"])
 
+      {:ok, _, _, %{data: %{"state" => "accept"}}} = CommonAPI.follow(other_user, user)
+      {:ok, _, _, %{data: %{"state" => "accept"}}} = CommonAPI.follow(user, other_user)
+
       {:ok, public_activity} = CommonAPI.post(other_user, %{status: ".", visibility: "public"})
 
       {:ok, direct_activity} =

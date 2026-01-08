@@ -62,7 +62,7 @@ defmodule Mix.Tasks.Pleroma.UploadsTest do
     upload_dir = Config.get([Pleroma.Uploaders.Local, :uploads])
 
     if not File.exists?(upload_dir) || File.ls!(upload_dir) == [] do
-      File.mkdir_p(upload_dir)
+      Pleroma.Backports.mkdir_p(upload_dir)
 
       Path.join([upload_dir, "file.txt"])
       |> File.touch()

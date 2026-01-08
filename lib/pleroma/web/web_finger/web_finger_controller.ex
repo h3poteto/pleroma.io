@@ -41,5 +41,10 @@ defmodule Pleroma.Web.WebFinger.WebFingerController do
     end
   end
 
+  # Default to JSON when no format is specified or format is not recognized
+  def webfinger(%{assigns: %{format: _format}} = conn, %{"resource" => _resource} = params) do
+    webfinger(put_in(conn.assigns.format, "json"), params)
+  end
+
   def webfinger(conn, _params), do: send_resp(conn, 400, "Bad Request")
 end

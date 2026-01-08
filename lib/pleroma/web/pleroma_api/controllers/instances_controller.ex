@@ -13,7 +13,7 @@ defmodule Pleroma.Web.PleromaAPI.InstancesController do
 
   def show(conn, _params) do
     unreachable =
-      Instances.get_consistently_unreachable()
+      Instances.get_unreachable()
       |> Map.new(fn {host, date} -> {host, to_string(date)} end)
 
     json(conn, %{"unreachable" => unreachable})

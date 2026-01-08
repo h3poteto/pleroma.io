@@ -575,6 +575,12 @@ defmodule Pleroma.ModerationLog do
     "@#{actor_nickname} requested account backup for @#{user_nickname}"
   end
 
+  def get_log_entry_message(%ModerationLog{data: data}) do
+    actor_name = get_in(data, ["actor", "nickname"]) || "unknown"
+    action = data["action"] || "unknown"
+    "@#{actor_name} performed action #{action}"
+  end
+
   defp nicknames_to_string(nicknames) do
     nicknames
     |> Enum.map(&"@#{&1}")

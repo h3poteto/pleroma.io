@@ -8,7 +8,7 @@ defmodule Pleroma.Web.Plugs.InstanceStaticTest do
   @dir "test/tmp/instance_static"
 
   setup do
-    File.mkdir_p!(@dir)
+    Pleroma.Backports.mkdir_p!(@dir)
     on_exit(fn -> File.rm_rf(@dir) end)
   end
 
@@ -34,7 +34,7 @@ defmodule Pleroma.Web.Plugs.InstanceStaticTest do
     refute html_response(bundled_index, 200) == "from frontend plug"
 
     path = "#{@dir}/frontends/#{name}/#{ref}"
-    File.mkdir_p!(path)
+    Pleroma.Backports.mkdir_p!(path)
     File.write!("#{path}/index.html", "from frontend plug")
 
     index = get(conn, "/")

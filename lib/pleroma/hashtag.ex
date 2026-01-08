@@ -130,4 +130,66 @@ defmodule Pleroma.Hashtag do
   end
 
   def get_recipients_for_activity(_activity), do: []
+
+  def search(query, options \\ []) do
+    limit = Keyword.get(options, :limit, 20)
+    offset = Keyword.get(options, :offset, 0)
+
+    search_terms =
+      query
+      |> String.downcase()
+      |> String.trim()
+      |> String.split(~r/\s+/)
+      |> Enum.filter(&(&1 != ""))
+      |> Enum.map(&String.trim_leading(&1, "#"))
+      |> Enum.filter(&(&1 != ""))
+
+    if Enum.empty?(search_terms) do
+      []
+    else
+      # Use PostgreSQL's ANY operator with array for efficient multi-term search
+      # This is much more efficient than multiple OR clauses
+      search_patterns = Enum.map(search_terms, &"%#{&1}%")
+
+      # Create ranking query that prioritizes exact matches and closer matches
+      # Use a subquery to properly handle computed columns in ORDER BY
+      base_query =
+        from(ht in Hashtag,
+          where: fragment("LOWER(?) LIKE ANY(?)", ht.name, ^search_patterns),
+          select: %{
+            name: ht.name,
+            # Ranking: exact matches get highest priority (0)
+            # then prefix matches (1), then contains (2)
+            match_rank:
+              fragment(
+                """
+                  CASE
+                    WHEN LOWER(?) = ANY(?) THEN 0
+                    WHEN LOWER(?) LIKE ANY(?) THEN 1
+                    ELSE 2
+                  END
+                """,
+                ht.name,
+                ^search_terms,
+                ht.name,
+                ^Enum.map(search_terms, &"#{&1}%")
+              ),
+            # Secondary sort by name length (shorter names first)
+            name_length: fragment("LENGTH(?)", ht.name)
+          }
+        )
+
+      from(result in subquery(base_query),
+        order_by: [
+          asc: result.match_rank,
+          asc: result.name_length,
+          asc: result.name
+        ],
+        limit: ^limit,
+        offset: ^offset
+      )
+      |> Repo.all()
+      |> Enum.map(& &1.name)
+    end
+  end
 end

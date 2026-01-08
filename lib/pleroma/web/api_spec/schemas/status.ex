@@ -219,7 +219,9 @@ defmodule Pleroma.Web.ApiSpec.Schemas.Status do
           },
           quotes_count: %Schema{
             type: :integer,
-            description: "How many statuses quoted this status"
+            deprecated: true,
+            description:
+              "How many statuses quoted this status. Deprecated, use `quotes_count` from parent object instead."
           },
           local: %Schema{
             type: :boolean,
@@ -259,6 +261,10 @@ defmodule Pleroma.Web.ApiSpec.Schemas.Status do
         }
       },
       poll: %Schema{allOf: [Poll], nullable: true, description: "The poll attached to the status"},
+      quotes_count: %Schema{
+        type: :integer,
+        description: "How many statuses quoted this status."
+      },
       reblog: %Schema{
         allOf: [%OpenApiSpex.Reference{"$ref": "#/components/schemas/Status"}],
         nullable: true,
@@ -385,6 +391,7 @@ defmodule Pleroma.Web.ApiSpec.Schemas.Status do
         "quotes_count" => 0
       },
       "poll" => nil,
+      "quotes_count" => 0,
       "reblog" => nil,
       "reblogged" => false,
       "reblogs_count" => 0,

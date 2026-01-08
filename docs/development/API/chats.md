@@ -66,9 +66,9 @@ Returned data:
     "username": "somenick",
     ...
   },
-  "id" : "1",
-  "unread" : 2,
-  "last_message" : {...}, // The last message in that chat
+  "id": "1",
+  "unread": 2,
+  "last_message": {...}, // The last message in that chat
   "updated_at": "2020-04-21T15:11:46.000Z"
 }
 ```
@@ -93,8 +93,8 @@ Returned data:
     "username": "somenick",
     ...
   },
-  "id" : "1",
-  "unread" : 0,
+  "id": "1",
+  "unread": 0,
   "updated_at": "2020-04-21T15:11:46.000Z"
 }
 ```
@@ -111,7 +111,7 @@ The modified chat message
 
 ### Getting a list of Chats
 
-`GET /api/v1/pleroma/chats`
+`GET /api/v2/pleroma/chats`
 
 This will return a list of chats that you have been involved in, sorted by their
 last update (so new chats will be at the top).
@@ -119,6 +119,7 @@ last update (so new chats will be at the top).
 Parameters:
 
 - with_muted: Include chats from muted users (boolean).
+- pinned: Include only pinned chats (boolean).
 
 Returned data:
 
@@ -130,16 +131,16 @@ Returned data:
         "username": "somenick",
         ...
       },
-      "id" : "1",
-      "unread" : 2,
-      "last_message" : {...}, // The last message in that chat
+      "id": "1",
+      "unread": 2,
+      "last_message": {...}, // The last message in that chat
       "updated_at": "2020-04-21T15:11:46.000Z"
    }
 ]
 ```
 
 The recipient of messages that are sent to this chat is given by their AP ID.
-No pagination is implemented for now.
+The usual pagination options are implemented.
 
 ### Getting the messages for a Chat
 
@@ -225,6 +226,32 @@ Deleting a chat message for given Chat id works like this:
 `DELETE /api/v1/pleroma/chats/:chat_id/messages/:message_id`
 
 Returned data is the deleted message.
+
+### Pinning a chat
+
+Pinning a chat works like this:
+
+`POST /api/v1/pleroma/chats/:id/pin`
+
+Returned data:
+
+```json
+{
+  "account": {
+    "id": "someflakeid",
+    "username": "somenick",
+    ...
+  },
+  "id": "1",
+  "unread": 0,
+  "updated_at": "2020-04-21T15:11:46.000Z",
+  "pinned": true,
+}
+```
+
+To unpin a pinned chat, use:
+
+`POST /api/v1/pleroma/chats/:id/unpin`
 
 ### Notifications
 

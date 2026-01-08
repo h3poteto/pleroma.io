@@ -1,5 +1,8 @@
 #!/bin/sh
 
+echo "adding ownership exception"
+git config --global --add safe.directory $(pwd)
+
 echo "looking for change log"
 
 git remote add upstream https://git.pleroma.social/pleroma/pleroma.git

@@ -7,7 +7,7 @@ defmodule Mix.Tasks.Pleroma.InstanceTest do
   use Pleroma.DataCase
 
   setup do
-    File.mkdir_p!(tmp_path())
+    Pleroma.Backports.mkdir_p!(tmp_path())
 
     on_exit(fn ->
       File.rm_rf(tmp_path())

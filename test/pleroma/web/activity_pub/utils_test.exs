@@ -670,4 +670,78 @@ defmodule Pleroma.Web.ActivityPub.UtilsTest do
       )
     end
   end
+
+  describe "maybe_anonymize_reporter/1" do
+    setup do
+      reporter = insert(:user)
+      report = %{"actor" => reporter.ap_id}
+
+      %{
+        placeholder: insert(:user),
+        reporter: reporter,
+        report: report
+      }
+    end
+
+    test "anonymize when configured correctly", %{
+      placeholder: placeholder,
+      report: report
+    } do
+      clear_config([:activitypub, :anonymize_reporter], true)
+      clear_config([:activitypub, :anonymize_reporter_local_nickname], placeholder.nickname)
+
+      assert %{"actor" => placeholder.ap_id} == Utils.maybe_anonymize_reporter(report)
+    end
+
+    test "anonymize Activity", %{
+      placeholder: placeholder,
+      reporter: reporter,
+      report: report
+    } do
+      clear_config([:activitypub, :anonymize_reporter], true)
+      clear_config([:activitypub, :anonymize_reporter_local_nickname], placeholder.nickname)
+      report_activity = %Activity{actor: reporter, data: report}
+      anon_id = placeholder.ap_id
+
+      assert %Activity{actor: ^anon_id, data: %{"actor" => ^anon_id}} =
+               Utils.maybe_anonymize_reporter(report_activity)
+    end
+
+    test "do not anonymize when disabled", %{
+      placeholder: placeholder,
+      reporter: reporter,
+      report: report
+    } do
+      clear_config([:activitypub, :anonymize_reporter], false)
+      clear_config([:activitypub, :anonymize_reporter_local_nickname], placeholder.nickname)
+
+      assert %{"actor" => reporter.ap_id} == Utils.maybe_anonymize_reporter(report)
+    end
+
+    test "do not anonymize when user does not exist", %{
+      placeholder: placeholder,
+      reporter: reporter,
+      report: report
+    } do
+      clear_config([:activitypub, :anonymize_reporter], true)
+
+      clear_config(
+        [:activitypub, :anonymize_reporter_local_nickname],
+        placeholder.nickname <> "MewMew"
+      )
+
+      assert %{"actor" => reporter.ap_id} == Utils.maybe_anonymize_reporter(report)
+    end
+
+    test "do not anonymize when user is not local", %{
+      reporter: reporter,
+      report: report
+    } do
+      placeholder = insert(:user, local: false)
+      clear_config([:activitypub, :anonymize_reporter], true)
+      clear_config([:activitypub, :anonymize_reporter_local_nickname], placeholder.nickname)
+
+      assert %{"actor" => reporter.ap_id} == Utils.maybe_anonymize_reporter(report)
+    end
+  end
 end

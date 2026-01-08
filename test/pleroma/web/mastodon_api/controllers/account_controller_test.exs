@@ -469,6 +469,17 @@ defmodule Pleroma.Web.MastodonAPI.AccountControllerTest do
       assert [%{"id" => ^post_id}] = json_response_and_validate_schema(conn, 200)
     end
 
+    test "gets only a user's reblogs", %{user: user, conn: conn} do
+      {:ok, %{id: post_id}} = CommonAPI.post(user, %{status: "HI!!!"})
+      {:ok, %{id: reblog_id}} = CommonAPI.repeat(post_id, user)
+
+      conn = get(conn, "/api/v1/accounts/#{user.id}/statuses?only_reblogs=true")
+      assert [%{"id" => ^reblog_id}] = json_response_and_validate_schema(conn, 200)
+
+      conn = get(conn, "/api/v1/accounts/#{user.id}/statuses?only_reblogs=1")
+      assert [%{"id" => ^reblog_id}] = json_response_and_validate_schema(conn, 200)
+    end
+
     test "filters user's statuses by a hashtag", %{user: user, conn: conn} do
       {:ok, %{id: post_id}} = CommonAPI.post(user, %{status: "#hashtag"})
       {:ok, _post} = CommonAPI.post(user, %{status: "hashtag"})
@@ -2093,6 +2104,50 @@ defmodule Pleroma.Web.MastodonAPI.AccountControllerTest do
       |> json_response_and_validate_schema(404)
   end
 
+  test "account lookup with restrict unauthenticated profiles for local" do
+    clear_config([:restrict_unauthenticated, :profiles, :local], true)
+
+    user = insert(:user, local: true)
+    reading_user = insert(:user)
+
+    conn =
+      build_conn()
+      |> get("/api/v1/accounts/lookup?acct=#{user.nickname}")
+
+    assert json_response_and_validate_schema(conn, 401)
+
+    conn =
+      build_conn()
+      |> assign(:user, reading_user)
+      |> assign(:token, insert(:oauth_token, user: reading_user, scopes: ["read:accounts"]))
+      |> get("/api/v1/accounts/lookup?acct=#{user.nickname}")
+
+    assert %{"id" => id} = json_response_and_validate_schema(conn, 200)
+    assert id == user.id
+  end
+
+  test "account lookup with restrict unauthenticated profiles for remote" do
+    clear_config([:restrict_unauthenticated, :profiles, :remote], true)
+
+    user = insert(:user, nickname: "user@example.com", local: false)
+    reading_user = insert(:user)
+
+    conn =
+      build_conn()
+      |> get("/api/v1/accounts/lookup?acct=#{user.nickname}")
+
+    assert json_response_and_validate_schema(conn, 401)
+
+    conn =
+      build_conn()
+      |> assign(:user, reading_user)
+      |> assign(:token, insert(:oauth_token, user: reading_user, scopes: ["read:accounts"]))
+      |> get("/api/v1/accounts/lookup?acct=#{user.nickname}")
+
+    assert %{"id" => id} = json_response_and_validate_schema(conn, 200)
+    assert id == user.id
+  end
+
   test "create a note on a user" do
     %{conn: conn} = oauth_access(["write:accounts", "read:follows"])
     other_user = insert(:user)
@@ -2123,7 +2178,7 @@ defmodule Pleroma.Web.MastodonAPI.AccountControllerTest do
       assert %{"id" => ^id1, "endorsed" => true} =
                conn
                |> put_req_header("content-type", "application/json")
-               |> post("/api/v1/accounts/#{id1}/pin")
+               |> post("/api/v1/accounts/#{id1}/endorse")
                |> json_response_and_validate_schema(200)
 
       assert [%{"id" => ^id1}] =
@@ -2142,7 +2197,7 @@ defmodule Pleroma.Web.MastodonAPI.AccountControllerTest do
       assert %{"id" => ^id1, "endorsed" => false} =
                conn
                |> put_req_header("content-type", "application/json")
-               |> post("/api/v1/accounts/#{id1}/unpin")
+               |> post("/api/v1/accounts/#{id1}/unendorse")
                |> json_response_and_validate_schema(200)
 
       assert [] =
@@ -2161,14 +2216,39 @@ defmodule Pleroma.Web.MastodonAPI.AccountControllerTest do
 
       conn
       |> put_req_header("content-type", "application/json")
-      |> post("/api/v1/accounts/#{id1}/pin")
+      |> post("/api/v1/accounts/#{id1}/endorse")
       |> json_response_and_validate_schema(200)
 
       assert %{"error" => "You have already pinned the maximum number of users"} =
                conn
                |> assign(:user, user)
-               |> post("/api/v1/accounts/#{id2}/pin")
+               |> post("/api/v1/accounts/#{id2}/endorse")
                |> json_response_and_validate_schema(400)
+    end
+
+    test "returns a list of pinned accounts", %{conn: conn} do
+      clear_config([:instance, :max_endorsed_users], 3)
+
+      %{id: id1} = user1 = insert(:user)
+      %{id: id2} = user2 = insert(:user)
+      %{id: id3} = user3 = insert(:user)
+
+      CommonAPI.follow(user2, user1)
+      CommonAPI.follow(user3, user1)
+
+      User.endorse(user1, user2)
+      User.endorse(user1, user3)
+
+      [%{"id" => ^id2}, %{"id" => ^id3}] =
+        conn
+        |> get("/api/v1/accounts/#{id1}/endorsements")
+        |> json_response_and_validate_schema(200)
+    end
+
+    test "returns 404 error when specified user is not exist", %{conn: conn} do
+      conn = get(conn, "/api/v1/accounts/test/endorsements")
+
+      assert json_response_and_validate_schema(conn, 404) == %{"error" => "Record not found"}
     end
   end
 

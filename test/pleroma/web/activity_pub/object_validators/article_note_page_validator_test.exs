@@ -5,11 +5,32 @@
 defmodule Pleroma.Web.ActivityPub.ObjectValidators.ArticleNotePageValidatorTest do
   use Pleroma.DataCase, async: true
 
+  alias Pleroma.Language.LanguageDetectorMock
+  alias Pleroma.StaticStubbedConfigMock
   alias Pleroma.Web.ActivityPub.ObjectValidator
   alias Pleroma.Web.ActivityPub.ObjectValidators.ArticleNotePageValidator
   alias Pleroma.Web.ActivityPub.Utils
 
+  import Mox
   import Pleroma.Factory
+
+  # Setup for all tests
+  setup do
+    # Stub the StaticStubbedConfigMock to return our mock for the provider
+    StaticStubbedConfigMock
+    |> stub(:get, fn
+      [Pleroma.Language.LanguageDetector, :provider] -> LanguageDetectorMock
+      _other -> nil
+    end)
+
+    # Stub the LanguageDetectorMock with default implementations
+    LanguageDetectorMock
+    |> stub(:missing_dependencies, fn -> [] end)
+    |> stub(:configured?, fn -> true end)
+    |> stub(:detect, fn _text -> nil end)
+
+    :ok
+  end
 
   describe "Notes" do
     setup do
@@ -232,6 +253,37 @@ defmodule Pleroma.Web.ActivityPub.ObjectValidators.ArticleNotePageValidatorTest 
       {:ok, object} = ArticleNotePageValidator.cast_and_apply(note)
 
       assert object.language == "pl"
+    end
+
+    test "it doesn't call LanguageDetector when language is specified" do
+      # Set up expectation that detect should not be called
+      LanguageDetectorMock
+      |> expect(:detect, 0, fn _ -> flunk("LanguageDetector.detect should not be called") end)
+      |> stub(:missing_dependencies, fn -> [] end)
+      |> stub(:configured?, fn -> true end)
+
+      # Stub the StaticStubbedConfigMock to return our mock for the provider
+      StaticStubbedConfigMock
+      |> stub(:get, fn
+        [Pleroma.Language.LanguageDetector, :provider] -> LanguageDetectorMock
+        _other -> nil
+      end)
+
+      user = insert(:user)
+
+      note = %{
+        "to" => ["https://www.w3.org/ns/activitystreams#Public"],
+        "cc" => [],
+        "id" => Utils.generate_object_id(),
+        "type" => "Note",
+        "content" => "a post in English",
+        "contentMap" => %{
+          "en" => "a post in English"
+        },
+        "attributedTo" => user.ap_id
+      }
+
+      ArticleNotePageValidator.cast_and_apply(note)
     end
 
     test "it adds contentMap if language is specified" do

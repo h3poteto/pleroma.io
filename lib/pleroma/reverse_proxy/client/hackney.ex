@@ -7,6 +7,11 @@ defmodule Pleroma.ReverseProxy.Client.Hackney do
 
   @impl true
   def request(method, url, headers, body, opts \\ []) do
+    opts =
+      Keyword.put_new(opts, :path_encode_fun, fn path ->
+        path
+      end)
+
     :hackney.request(method, url, headers, body, opts)
   end
 

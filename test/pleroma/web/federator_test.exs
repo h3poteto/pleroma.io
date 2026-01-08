@@ -126,22 +126,17 @@ defmodule Pleroma.Web.FederatorTest do
         inbox: inbox2
       })
 
-      dt = NaiveDateTime.utc_now()
-      Instances.set_unreachable(inbox1, dt)
-
-      Instances.set_consistently_unreachable(URI.parse(inbox2).host)
+      Instances.set_unreachable(URI.parse(inbox2).host)
 
       {:ok, _activity} =
         CommonAPI.post(user, %{status: "HI @nick1@domain.com, @nick2@domain2.com!"})
-
-      expected_dt = NaiveDateTime.to_iso8601(dt)
 
       ObanHelpers.perform(all_enqueued(worker: PublisherWorker))
 
       assert ObanHelpers.member?(
                %{
                  "op" => "publish_one",
-                 "params" => %{"inbox" => inbox1, "unreachable_since" => expected_dt}
+                 "params" => %{"inbox" => inbox1}
                },
                all_enqueued(worker: PublisherWorker)
              )

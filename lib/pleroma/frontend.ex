@@ -66,7 +66,7 @@ defmodule Pleroma.Frontend do
 
   def unzip(zip, dest) do
     File.rm_rf!(dest)
-    File.mkdir_p!(dest)
+    Pleroma.Backports.mkdir_p!(dest)
 
     case Pleroma.SafeZip.unzip_data(zip, dest) do
       {:ok, _} -> :ok
@@ -90,7 +90,7 @@ defmodule Pleroma.Frontend do
   defp install_frontend(frontend_info, source, dest) do
     from = frontend_info["build_dir"] || "dist"
     File.rm_rf!(dest)
-    File.mkdir_p!(dest)
+    Pleroma.Backports.mkdir_p!(dest)
     File.cp_r!(Path.join([source, from]), dest)
     :ok
   end

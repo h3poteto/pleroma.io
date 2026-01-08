@@ -9,46 +9,22 @@ defmodule Pleroma.Web.PleromaAPI.StatusControllerTest do
 
   import Pleroma.Factory
 
-  describe "getting quotes of a specified post" do
-    setup do
-      [current_user, user] = insert_pair(:user)
-      %{user: current_user, conn: conn} = oauth_access(["read:statuses"], user: current_user)
-      [current_user: current_user, user: user, conn: conn]
-    end
+  test "/quotes fallback works" do
+    [current_user, user] = insert_pair(:user)
+    %{conn: conn} = oauth_access(["read:statuses"], user: current_user)
 
-    test "shows quotes of a post", %{conn: conn} do
-      user = insert(:user)
-      activity = insert(:note_activity)
+    activity = insert(:note_activity)
 
-      {:ok, quote_post} = CommonAPI.post(user, %{status: "quoat", quote_id: activity.id})
+    {:ok, quote_post} = CommonAPI.post(user, %{status: "quoat", quoted_status_id: activity.id})
 
-      response =
-        conn
-        |> get("/api/v1/pleroma/statuses/#{activity.id}/quotes")
-        |> json_response_and_validate_schema(:ok)
+    response =
+      conn
+      |> get("/api/v1/pleroma/statuses/#{activity.id}/quotes")
+      |> json_response_and_validate_schema(:ok)
 
-      [status] = response
+    [status] = response
 
-      assert length(response) == 1
-      assert status["id"] == quote_post.id
-    end
-
-    test "returns 404 error when a post can't be seen", %{conn: conn} do
-      activity = insert(:direct_note_activity)
-
-      response =
-        conn
-        |> get("/api/v1/pleroma/statuses/#{activity.id}/quotes")
-
-      assert json_response_and_validate_schema(response, 404) == %{"error" => "Record not found"}
-    end
-
-    test "returns 404 error when a post does not exist", %{conn: conn} do
-      response =
-        conn
-        |> get("/api/v1/pleroma/statuses/idontexist/quotes")
-
-      assert json_response_and_validate_schema(response, 404) == %{"error" => "Record not found"}
-    end
+    assert length(response) == 1
+    assert status["id"] == quote_post.id
   end
 end

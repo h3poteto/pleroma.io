@@ -50,13 +50,7 @@ defmodule Pleroma.Web.ActivityPub.ObjectValidators.TagValidator do
   end
 
   def changeset(struct, %{"type" => "Hashtag", "name" => name} = data) do
-    name =
-      cond do
-        "#" <> name -> name
-        name -> name
-      end
-      |> String.downcase()
-
+    name = String.downcase(name)
     data = Map.put(data, "name", name)
 
     struct

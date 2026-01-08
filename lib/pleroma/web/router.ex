@@ -190,7 +190,7 @@ defmodule Pleroma.Web.Router do
   end
 
   pipeline :well_known do
-    plug(:accepts, ["activity+json", "json", "jrd", "jrd+json", "xml", "xrd+xml"])
+    plug(:accepts, ["activity+json", "json", "jrd", "jrd+json", "xml", "xrd+xml", "html"])
   end
 
   pipeline :config do
@@ -467,6 +467,7 @@ defmodule Pleroma.Web.Router do
       get("/import", EmojiPackController, :import_from_filesystem)
       get("/remote", EmojiPackController, :remote)
       post("/download", EmojiPackController, :download)
+      post("/download_zip", EmojiPackController, :download_zip)
 
       post("/files", EmojiFileController, :create)
       patch("/files", EmojiFileController, :update)
@@ -561,6 +562,18 @@ defmodule Pleroma.Web.Router do
     get("/apps", AppController, :index)
     get("/statuses/:id/reactions/:emoji", EmojiReactionController, :index)
     get("/statuses/:id/reactions", EmojiReactionController, :index)
+
+    get(
+      "/preferred_frontend/available",
+      FrontendSettingsController,
+      :available_frontends
+    )
+
+    put(
+      "/preferred_frontend",
+      FrontendSettingsController,
+      :update_preferred_frontend
+    )
   end
 
   scope "/api/v0/pleroma", Pleroma.Web.PleromaAPI do
@@ -581,6 +594,8 @@ defmodule Pleroma.Web.Router do
       delete("/chats/:id/messages/:message_id", ChatController, :delete_message)
       post("/chats/:id/read", ChatController, :mark_as_read)
       post("/chats/:id/messages/:message_id/read", ChatController, :mark_message_as_read)
+      post("/chats/:id/pin", ChatController, :pin)
+      post("/chats/:id/unpin", ChatController, :unpin)
 
       get("/conversations/:id/statuses", ConversationController, :statuses)
       get("/conversations/:id", ConversationController, :show)
@@ -603,12 +618,13 @@ defmodule Pleroma.Web.Router do
       post("/bookmark_folders", BookmarkFolderController, :create)
       patch("/bookmark_folders/:id", BookmarkFolderController, :update)
       delete("/bookmark_folders/:id", BookmarkFolderController, :delete)
+
+      get("/outgoing_follow_requests", FollowRequestController, :outgoing)
     end
 
     scope [] do
       pipe_through(:api)
       get("/accounts/:id/favourites", AccountController, :favourites)
-      get("/accounts/:id/endorsements", AccountController, :endorsements)
 
       get("/statuses/:id/quotes", StatusController, :quotes)
     end
@@ -637,6 +653,11 @@ defmodule Pleroma.Web.Router do
     get("/accounts/:id/scrobbles", ScrobbleController, :index)
   end
 
+  scope "/api/v1/pleroma", Pleroma.Web.MastodonAPI do
+    pipe_through(:api)
+    get("/accounts/:id/endorsements", AccountController, :endorsements)
+  end
+
   scope "/api/v2/pleroma", Pleroma.Web.PleromaAPI do
     scope [] do
       pipe_through(:authenticated_api)
@@ -653,7 +674,7 @@ defmodule Pleroma.Web.Router do
     get("/accounts/relationships", AccountController, :relationships)
     get("/accounts/familiar_followers", AccountController, :familiar_followers)
     get("/accounts/:id/lists", AccountController, :lists)
-    get("/endorsements", AccountController, :endorsements)
+    get("/endorsements", AccountController, :own_endorsements)
     get("/blocks", AccountController, :blocks)
     get("/mutes", AccountController, :mutes)
 
@@ -667,6 +688,8 @@ defmodule Pleroma.Web.Router do
     post("/accounts/:id/note", AccountController, :note)
     post("/accounts/:id/pin", AccountController, :endorse)
     post("/accounts/:id/unpin", AccountController, :unendorse)
+    post("/accounts/:id/endorse", AccountController, :endorse)
+    post("/accounts/:id/unendorse", AccountController, :unendorse)
     post("/accounts/:id/remove_from_followers", AccountController, :remove_from_followers)
 
     get("/conversations", ConversationController, :index)
@@ -741,6 +764,8 @@ defmodule Pleroma.Web.Router do
     post("/statuses/:id/unbookmark", StatusController, :unbookmark)
     post("/statuses/:id/mute", StatusController, :mute_conversation)
     post("/statuses/:id/unmute", StatusController, :unmute_conversation)
+    post("/statuses/:id/translate", StatusController, :translate)
+    get("/statuses/:id/quotes", StatusController, :quotes)
 
     post("/push/subscription", SubscriptionController, :create)
     get("/push/subscription", SubscriptionController, :show)
@@ -781,6 +806,7 @@ defmodule Pleroma.Web.Router do
     get("/accounts/:id/statuses", AccountController, :statuses)
     get("/accounts/:id/followers", AccountController, :followers)
     get("/accounts/:id/following", AccountController, :following)
+    get("/accounts/:id/endorsements", AccountController, :endorsements)
     get("/accounts/:id", AccountController, :show)
 
     post("/accounts", AccountController, :create)
@@ -788,6 +814,7 @@ defmodule Pleroma.Web.Router do
     get("/instance", InstanceController, :show)
     get("/instance/peers", InstanceController, :peers)
     get("/instance/rules", InstanceController, :rules)
+    get("/instance/translation_languages", InstanceController, :translation_languages)
 
     get("/statuses", StatusController, :index)
     get("/statuses/:id", StatusController, :show)
@@ -892,7 +919,11 @@ defmodule Pleroma.Web.Router do
 
   scope "/", Pleroma.Web do
     pipe_through(:browser)
+
     get("/mailer/unsubscribe/:token", Mailer.SubscriptionController, :unsubscribe)
+
+    get("/frontend_switcher", FrontendSwitcher.FrontendSwitcherController, :switch)
+    post("/frontend_switcher", FrontendSwitcher.FrontendSwitcherController, :do_switch)
   end
 
   pipeline :ap_service_actor do
@@ -942,6 +973,7 @@ defmodule Pleroma.Web.Router do
     get("/users/:nickname/followers", ActivityPubController, :followers)
     get("/users/:nickname/following", ActivityPubController, :following)
     get("/users/:nickname/collections/featured", ActivityPubController, :pinned)
+    get("/objects/:uuid/replies", ActivityPubController, :object_replies)
   end
 
   scope "/", Pleroma.Web.ActivityPub do

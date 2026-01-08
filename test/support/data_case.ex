@@ -119,6 +119,12 @@ defmodule Pleroma.DataCase do
     Mox.stub_with(Pleroma.StubbedHTTPSignaturesMock, Pleroma.Test.HTTPSignaturesProxy)
 
     Mox.stub_with(Pleroma.DateTimeMock, Pleroma.DateTime.Impl)
+    Mox.stub_with(Pleroma.SignatureMock, Pleroma.Signature)
+
+    Mox.stub_with(
+      Pleroma.Web.ActivityPub.TransmogrifierMock,
+      Pleroma.Web.ActivityPub.Transmogrifier
+    )
   end
 
   def ensure_local_uploader(context) do

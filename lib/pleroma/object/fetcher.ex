@@ -4,7 +4,6 @@
 
 defmodule Pleroma.Object.Fetcher do
   alias Pleroma.HTTP
-  alias Pleroma.Instances
   alias Pleroma.Maps
   alias Pleroma.Object
   alias Pleroma.Object.Containment
@@ -18,8 +17,6 @@ defmodule Pleroma.Object.Fetcher do
 
   require Logger
   require Pleroma.Constants
-
-  @mix_env Mix.env()
 
   @spec reinject_object(struct(), map()) :: {:ok, Object.t()} | {:error, any()}
   defp reinject_object(%Object{data: %{}} = object, new_data) do
@@ -152,10 +149,6 @@ defmodule Pleroma.Object.Fetcher do
          {:ok, body} <- get_object(id),
          {:ok, data} <- safe_json_decode(body),
          :ok <- Containment.contain_origin_from_id(id, data) do
-      if not Instances.reachable?(id) do
-        Instances.set_reachable(id)
-      end
-
       {:ok, data}
     else
       {:scheme, _} ->
@@ -178,13 +171,8 @@ defmodule Pleroma.Object.Fetcher do
   def fetch_and_contain_remote_object_from_id(_id),
     do: {:error, "id must be a string"}
 
-  defp check_crossdomain_redirect(final_host, original_url)
-
-  # Handle the common case in tests where responses don't include URLs
-  if @mix_env == :test do
-    defp check_crossdomain_redirect(nil, _) do
-      {:cross_domain_redirect, false}
-    end
+  defp check_crossdomain_redirect(final_host, _original_url) when is_nil(final_host) do
+    {:cross_domain_redirect, false}
   end
 
   defp check_crossdomain_redirect(final_host, original_url) do
