@@ -9,12 +9,12 @@ defmodule Pleroma.SafeZipTest do
 
   setup do
     # Ensure tmp directory exists
-    File.mkdir_p!(@tmp_dir)
+    Pleroma.Backports.mkdir_p!(@tmp_dir)
 
     on_exit(fn ->
       # Clean up any files created during tests
       File.rm_rf!(@tmp_dir)
-      File.mkdir_p!(@tmp_dir)
+      Pleroma.Backports.mkdir_p!(@tmp_dir)
     end)
 
     :ok
@@ -89,7 +89,7 @@ defmodule Pleroma.SafeZipTest do
       # For this test, we'll manually check if the file exists in the archive
       # by extracting it and verifying it exists
       extract_dir = Path.join(@tmp_dir, "extract_check")
-      File.mkdir_p!(extract_dir)
+      Pleroma.Backports.mkdir_p!(extract_dir)
       {:ok, files} = SafeZip.unzip_file(zip_path, extract_dir)
 
       # Verify the root file was extracted
@@ -145,7 +145,7 @@ defmodule Pleroma.SafeZipTest do
     test "can create zip with directories" do
       # Create a directory structure
       dir_path = Path.join(@tmp_dir, "test_dir")
-      File.mkdir_p!(dir_path)
+      Pleroma.Backports.mkdir_p!(dir_path)
 
       file_in_dir_path = Path.join(dir_path, "file_in_dir.txt")
       File.write!(file_in_dir_path, "file in directory")
@@ -428,7 +428,7 @@ defmodule Pleroma.SafeZipTest do
 
     # Create a directory and a file in it
     dir_path = Path.join(@tmp_dir, "file_in_dir")
-    File.mkdir_p!(dir_path)
+    Pleroma.Backports.mkdir_p!(dir_path)
 
     file_in_dir_path = Path.join(dir_path, "test_file.txt")
     File.write!(file_in_dir_path, "file in directory content")

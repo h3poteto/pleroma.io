@@ -9,10 +9,12 @@ defmodule Pleroma.Web.MastodonAPI.StatusController do
     only: [try_render: 3, add_link_headers: 2]
 
   require Ecto.Query
+  require Pleroma.Constants
 
   alias Pleroma.Activity
   alias Pleroma.Bookmark
   alias Pleroma.BookmarkFolder
+  alias Pleroma.Language.Translation
   alias Pleroma.Object
   alias Pleroma.Repo
   alias Pleroma.ScheduledActivity
@@ -40,9 +42,12 @@ defmodule Pleroma.Web.MastodonAPI.StatusController do
            :show,
            :context,
            :show_history,
-           :show_source
+           :show_source,
+           :quotes
          ]
   )
+
+  plug(OAuthScopesPlug, %{scopes: ["read:statuses"]} when action == :translate)
 
   plug(
     OAuthScopesPlug,
@@ -85,7 +90,7 @@ defmodule Pleroma.Web.MastodonAPI.StatusController do
     %{scopes: ["write:bookmarks"]} when action in [:bookmark, :unbookmark]
   )
 
-  @rate_limited_status_actions ~w(reblog unreblog favourite unfavourite create delete)a
+  @rate_limited_status_actions ~w(reblog unreblog favourite unfavourite create delete translate)a
 
   plug(
     RateLimiter,
@@ -314,6 +319,7 @@ defmodule Pleroma.Web.MastodonAPI.StatusController do
   @doc "DELETE /api/v1/statuses/:id"
   def delete(%{assigns: %{user: user}, private: %{open_api_spex: %{params: %{id: id}}}} = conn, _) do
     with %Activity{} = activity <- Activity.get_by_id_with_object(id),
+         # CommonAPI already checks whether user is allowed to delete
          {:ok, %Activity{}} <- CommonAPI.delete(id, user) do
       try_render(conn, "show.json",
         activity: activity,
@@ -335,6 +341,7 @@ defmodule Pleroma.Web.MastodonAPI.StatusController do
         _
       ) do
     with {:ok, announce} <- CommonAPI.repeat(ap_id_or_id, user, params),
+         # CommonAPI already checks whether user is allowed to reblog
          %Activity{} = announce <- Activity.normalize(announce.data) do
       try_render(conn, "show.json", %{activity: announce, for: user, as: :activity})
     end
@@ -359,6 +366,7 @@ defmodule Pleroma.Web.MastodonAPI.StatusController do
         _
       ) do
     with {:ok, _fav} <- CommonAPI.favorite(activity_id, user),
+         # CommonAPI already checks whether user is allowed to reblog
          %Activity{} = activity <- Activity.get_by_id(activity_id) do
       try_render(conn, "show.json", activity: activity, for: user, as: :activity)
     end
@@ -385,6 +393,8 @@ defmodule Pleroma.Web.MastodonAPI.StatusController do
     with {:ok, activity} <- CommonAPI.pin(ap_id_or_id, user) do
       try_render(conn, "show.json", activity: activity, for: user, as: :activity)
     else
+      # Order matters, if status is not owned by user and is not visible to user
+      # return 404 just like other endpoints
       {:error, :pinned_statuses_limit_reached} ->
         {:error, "You have already pinned the maximum number of statuses"}
 
@@ -392,6 +402,9 @@ defmodule Pleroma.Web.MastodonAPI.StatusController do
         {:error, :unprocessable_entity, "Someone else's status cannot be pinned"}
 
       {:error, :visibility_error} ->
+        {:error, :not_found, "Record not found"}
+
+      {:error, :non_public_error} ->
         {:error, :unprocessable_entity, "Non-public status cannot be pinned"}
 
       error ->
@@ -405,8 +418,20 @@ defmodule Pleroma.Web.MastodonAPI.StatusController do
           conn,
         _
       ) do
+    # CommonAPI already checks whether user can unpin
     with {:ok, activity} <- CommonAPI.unpin(ap_id_or_id, user) do
       try_render(conn, "show.json", activity: activity, for: user, as: :activity)
+    else
+      # Order matters, if status is not owned by user and is not visible to user
+      # return 404 just like other endpoints
+      {:error, :visibility_error} ->
+        {:error, :not_found, "Record not found"}
+
+      {:error, :ownership_error} ->
+        {:error, :unprocessable_entity, "Someone else's status cannot be unpinned"}
+
+      error ->
+        error
     end
   end
 
@@ -429,6 +454,12 @@ defmodule Pleroma.Web.MastodonAPI.StatusController do
            ),
          {:ok, _bookmark} <- Bookmark.create(user.id, activity.id, folder_id) do
       try_render(conn, "show.json", activity: activity, for: user, as: :activity)
+    else
+      false ->
+        {:error, :not_found, "Record not found"}
+
+      error ->
+        error
     end
   end
 
@@ -442,6 +473,12 @@ defmodule Pleroma.Web.MastodonAPI.StatusController do
          true <- Visibility.visible_for_user?(activity, user),
          {:ok, _bookmark} <- Bookmark.destroy(user.id, activity.id) do
       try_render(conn, "show.json", activity: activity, for: user, as: :activity)
+    else
+      false ->
+        {:error, :not_found, "Record not found"}
+
+      error ->
+        error
     end
   end
 
@@ -454,8 +491,15 @@ defmodule Pleroma.Web.MastodonAPI.StatusController do
         _
       ) do
     with %Activity{} = activity <- Activity.get_by_id(id),
+         # CommonAPI already checks whether user is allowed to mute
          {:ok, activity} <- CommonAPI.add_mute(activity, user, params) do
       try_render(conn, "show.json", activity: activity, for: user, as: :activity)
+    else
+      {:error, :visibility_error} ->
+        {:error, :not_found, "Record not found"}
+
+      error ->
+        error
     end
   end
 
@@ -468,8 +512,15 @@ defmodule Pleroma.Web.MastodonAPI.StatusController do
         _
       ) do
     with %Activity{} = activity <- Activity.get_by_id(id),
+         # CommonAPI already checks whether user is allowed to unmute
          {:ok, activity} <- CommonAPI.remove_mute(activity, user) do
       try_render(conn, "show.json", activity: activity, for: user, as: :activity)
+    else
+      {:error, :visibility_error} ->
+        {:error, :not_found, "Record not found"}
+
+      error ->
+        error
     end
   end
 
@@ -485,6 +536,7 @@ defmodule Pleroma.Web.MastodonAPI.StatusController do
       users =
         User
         |> Ecto.Query.where([u], u.ap_id in ^likes)
+        |> Ecto.Query.order_by([u], fragment("array_position(?, ?)", ^likes, u.ap_id))
         |> Repo.all()
         |> Enum.filter(&(not User.blocks?(user, &1)))
 
@@ -520,6 +572,7 @@ defmodule Pleroma.Web.MastodonAPI.StatusController do
       users =
         User
         |> Ecto.Query.where([u], u.ap_id in ^announces)
+        |> Ecto.Query.order_by([u], fragment("array_position(?, ?)", ^announces, u.ap_id))
         |> Repo.all()
         |> Enum.filter(&(not User.blocks?(user, &1)))
 
@@ -546,6 +599,44 @@ defmodule Pleroma.Web.MastodonAPI.StatusController do
         })
 
       render(conn, "context.json", activity: activity, activities: activities, user: user)
+    end
+  end
+
+  @doc "POST /api/v1/statuses/:id/translate"
+  def translate(
+        %{
+          assigns: %{user: user},
+          private: %{open_api_spex: %{body_params: params, params: %{id: status_id}}}
+        } = conn,
+        _
+      ) do
+    with %Activity{object: object} <- Activity.get_by_id_with_object(status_id),
+         {:visibility, visibility} when visibility in ["public", "unlisted"] <-
+           {:visibility, Visibility.get_visibility(object)},
+         {:language, language} when is_binary(language) <-
+           {:language, Map.get(params, :lang) || user.language},
+         {:ok, result} <-
+           Translation.translate(
+             object.data["content"],
+             object.data["language"],
+             language
+           ) do
+      render(conn, "translation.json", result)
+    else
+      {:language, nil} ->
+        render_error(conn, :bad_request, "Language not specified")
+
+      {:visibility, _} ->
+        render_error(conn, :not_found, "Record not found")
+
+      {:error, :not_found} ->
+        render_error(conn, :not_found, "Translation service not configured")
+
+      {:error, error} when error in [:unexpected_response, :quota_exceeded, :too_many_requests] ->
+        render_error(conn, :service_unavailable, "Translation service not available")
+
+      _ ->
+        render_error(conn, :internal_server_error, "Translation failed")
     end
   end
 
@@ -586,6 +677,45 @@ defmodule Pleroma.Web.MastodonAPI.StatusController do
       for: user,
       as: :activity
     )
+  end
+
+  @doc "GET /api/v1/statuses/:id/quotes"
+  def quotes(
+        %{assigns: %{user: user}, private: %{open_api_spex: %{params: %{id: id} = params}}} =
+          conn,
+        _
+      ) do
+    with %Activity{object: object} = activity <- Activity.get_by_id_with_object(id),
+         true <- Visibility.visible_for_user?(activity, user) do
+      params =
+        params
+        |> Map.put(:type, "Create")
+        |> Map.put(:blocking_user, user)
+        |> Map.put(:quote_url, object.data["id"])
+
+      recipients =
+        if user do
+          [Pleroma.Constants.as_public()] ++ [user.ap_id | User.following(user)]
+        else
+          [Pleroma.Constants.as_public()]
+        end
+
+      activities =
+        recipients
+        |> ActivityPub.fetch_activities(params)
+        |> Enum.reverse()
+
+      conn
+      |> add_link_headers(activities)
+      |> render("index.json",
+        activities: activities,
+        for: user,
+        as: :activity
+      )
+    else
+      nil -> {:error, :not_found}
+      false -> {:error, :not_found}
+    end
   end
 
   defp put_application(params, %{assigns: %{token: %Token{user: %User{} = user} = token}} = _conn) do

@@ -3,6 +3,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 
 defmodule Pleroma.ReverseProxy do
+  alias Pleroma.Utils.URIEncoding
+
   @range_headers ~w(range if-range)
   @keep_req_headers ~w(accept accept-encoding cache-control if-modified-since) ++
                       ~w(if-unmodified-since if-none-match) ++ @range_headers
@@ -155,8 +157,11 @@ defmodule Pleroma.ReverseProxy do
   end
 
   defp request(method, url, headers, opts) do
-    Logger.debug("#{__MODULE__} #{method} #{url} #{inspect(headers)}")
     method = method |> String.downcase() |> String.to_existing_atom()
+
+    url = maybe_encode_url(url)
+
+    Logger.debug("#{__MODULE__} #{method} #{url} #{inspect(headers)}")
 
     case client().request(method, url, headers, "", opts) do
       {:ok, code, headers, client} when code in @valid_resp_codes ->
@@ -447,6 +452,20 @@ defmodule Pleroma.ReverseProxy do
       conn
     else
       _ -> delete_resp_header(conn, "content-length")
+    end
+  end
+
+  # Only when Tesla adapter is Hackney or Finch does the URL
+  # need encoding before Reverse Proxying as both end up
+  # using the raw Hackney client and cannot leverage our
+  # EncodeUrl Tesla middleware
+  # Also do it for test environment
+  defp maybe_encode_url(url) do
+    case Application.get_env(:tesla, :adapter) do
+      Tesla.Adapter.Hackney -> URIEncoding.encode_url(url)
+      {Tesla.Adapter.Finch, _} -> URIEncoding.encode_url(url)
+      Tesla.Mock -> URIEncoding.encode_url(url)
+      _ -> url
     end
   end
 end

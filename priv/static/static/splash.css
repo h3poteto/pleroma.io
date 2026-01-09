@@ -1,0 +1,132 @@
+body {
+  margin: 0;
+  padding: 0;
+}
+
+#splash {
+  --scale: 1;
+
+  width: 100vw;
+  height: 100vh;
+  display: grid;
+  grid-template-rows: auto;
+  grid-template-columns: auto;
+  align-content: center;
+  place-items: center;
+  flex-direction: column;
+  background: #0f161e;
+  font-family: sans-serif;
+  color: #b9b9ba;
+  position: absolute;
+  z-index: 9999;
+  font-size: calc(1vw + 1vh + 1vmin);
+  opacity: 1;
+  transition: opacity 500ms ease-out 2s;
+}
+
+#splash.hidden,
+#splash.initial-hidden {
+  opacity: 0;
+}
+
+#splash-credit {
+  position: absolute;
+  font-size: 1em;
+  bottom: 1em;
+  right: 1em;
+}
+
+#splash-container {
+  align-items: center;
+}
+
+#mascot-container {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  perspective: 60em;
+  perspective-origin: 0 -15em;
+  transform-style: preserve-3d;
+}
+
+#mascot {
+  width: calc(10em * var(--scale));
+  height: calc(10em * var(--scale));
+  object-fit: contain;
+  object-position: bottom;
+  transform: translateZ(-2em);
+}
+
+#throbber {
+  display: grid;
+  width: calc(5em * 0.5 * var(--scale));
+  height: calc(8em * 0.5 * var(--scale));
+  margin-left: 4.1em;
+  z-index: 2;
+  grid-template-rows: repeat(8, 1fr);
+  grid-template-columns: repeat(5, 1fr);
+  grid-template-areas: "P P . L L"
+                       "P P . L L"
+                       "P P . L L"
+                       "P P . L L"
+                       "P P . . ."
+                       "P P . . ."
+                       "P P . E E"
+                       "P P . E E";
+
+  --logoChunkSize: calc(2em * 0.5 * var(--scale))
+}
+
+.chunk {
+  background-color: #e2b188;
+  box-shadow: 0.01em 0.01em 0.1em 0 #e2b188;
+}
+
+#chunk-P {
+  grid-area: P;
+  border-top-left-radius:  calc(var(--logoChunkSize) / 2);
+}
+
+#chunk-L {
+  grid-area: L;
+  border-bottom-right-radius: calc(var(--logoChunkSize) / 2);
+}
+
+#chunk-E {
+  grid-area: E;
+  border-bottom-right-radius: calc(var(--logoChunkSize) / 2);
+}
+
+#status {
+  margin-top: 1em;
+  line-height: 2;
+  width: 100%;
+  text-align: center;
+}
+
+#statusError {
+  display: none;
+  margin-top: 1em;
+  font-size: calc(1vw + 1vh + 1vmin);
+  line-height: 2;
+  width: 100%;
+  text-align: center;
+}
+
+#statusStack {
+  display: none;
+  margin-top: 1em;
+  font-size: calc((1vw + 1vh + 1vmin) / 2.5);
+  width: calc(100vw - 5em);
+  padding: 1em;
+  text-overflow: ellipsis;
+  overflow-x: hidden;
+  text-align: left;
+  line-height: 2;
+}
+
+@media (prefers-reduced-motion) {
+  #throbber {
+    animation: none !important;
+  }
+}

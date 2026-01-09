@@ -5,7 +5,8 @@
 defmodule Pleroma.Web.Plugs.CacheTest do
   # Relies on Cachex, has to stay synchronous
   use Pleroma.DataCase
-  use Plug.Test
+  import Plug.Conn
+  import Plug.Test
 
   alias Pleroma.Web.Plugs.Cache
 

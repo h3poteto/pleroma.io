@@ -4,6 +4,7 @@
 
 defmodule Pleroma.Web.RichMedia.Parser do
   alias Pleroma.Web.RichMedia.Helpers
+  import Pleroma.Web.Metadata.Utils, only: [scrub_html_and_truncate: 2]
   require Logger
 
   @config_impl Application.compile_env(:pleroma, [__MODULE__, :config_impl], Pleroma.Config)
@@ -63,7 +64,19 @@ defmodule Pleroma.Web.RichMedia.Parser do
       not match?({:ok, _}, Jason.encode(%{key => val}))
     end)
     |> Map.new()
+    |> truncate_title()
+    |> truncate_desc()
   end
+
+  defp truncate_title(%{"title" => title} = data) when is_binary(title),
+    do: %{data | "title" => scrub_html_and_truncate(title, 120)}
+
+  defp truncate_title(data), do: data
+
+  defp truncate_desc(%{"description" => desc} = data) when is_binary(desc),
+    do: %{data | "description" => scrub_html_and_truncate(desc, 200)}
+
+  defp truncate_desc(data), do: data
 
   @spec validate_page_url(URI.t() | binary()) :: :ok | :error
   defp validate_page_url(page_url) when is_binary(page_url) do

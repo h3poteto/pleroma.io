@@ -19,7 +19,8 @@ defmodule Pleroma.Web.ApiSpec.PleromaStatusOperation do
     %Operation{
       tags: ["Retrieve status information"],
       summary: "Quoted by",
-      description: "View quotes for a given status",
+      deprecated: true,
+      description: "View quotes for a given status. Use /api/v1/statuses/:id/quotes instead.",
       operationId: "PleromaAPI.StatusController.quotes",
       parameters: [id_param() | pagination_params()],
       security: [%{"oAuth" => ["read:statuses"]}],

@@ -64,25 +64,6 @@ defmodule Pleroma.Web.ApiSpec.PleromaAccountOperation do
     }
   end
 
-  def endorsements_operation do
-    %Operation{
-      tags: ["Retrieve account information"],
-      summary: "Endorsements",
-      description: "Returns endorsed accounts",
-      operationId: "PleromaAPI.AccountController.endorsements",
-      parameters: [with_relationships_param(), id_param()],
-      responses: %{
-        200 =>
-          Operation.response(
-            "Array of Accounts",
-            "application/json",
-            AccountOperation.array_of_accounts()
-          ),
-        404 => Operation.response("Not Found", "application/json", ApiError)
-      }
-    }
-  end
-
   def subscribe_operation do
     %Operation{
       deprecated: true,

@@ -17,6 +17,7 @@ defmodule Pleroma.NotificationTest do
   alias Pleroma.Web.ActivityPub.Transmogrifier
   alias Pleroma.Web.CommonAPI
   alias Pleroma.Web.MastodonAPI.NotificationView
+  alias Pleroma.Web.Streamer
 
   setup do
     Mox.stub_with(Pleroma.UnstubbedConfigMock, Pleroma.Test.StaticConfig)
@@ -446,8 +447,7 @@ defmodule Pleroma.NotificationTest do
 
   describe "set_read_up_to()" do
     test "it sets all notifications as read up to a specified notification ID" do
-      user = insert(:user)
-      other_user = insert(:user)
+      [user, other_user] = insert_pair(:user)
 
       {:ok, _activity} =
         CommonAPI.post(user, %{
@@ -485,6 +485,37 @@ defmodule Pleroma.NotificationTest do
                )
 
       assert m.last_read_id == to_string(n2.id)
+    end
+
+    @tag needs_streamer: true
+    test "it sends updated marker to the 'user' and the 'user:notification' stream" do
+      %{user: user, token: oauth_token} = oauth_access(["read"])
+      other_user = insert(:user)
+
+      {:ok, _activity} =
+        CommonAPI.post(other_user, %{
+          status: "hi @#{user.nickname}!"
+        })
+
+      [%{id: notification_id}] = Notification.for_user(user)
+
+      notification_id = to_string(notification_id)
+
+      task =
+        Task.async(fn ->
+          {:ok, _topic} =
+            Streamer.get_topic_and_add_socket("user:notification", user, oauth_token)
+
+          assert_receive {:text, event}, 4_000
+
+          assert %{"event" => "marker", "payload" => payload} = Jason.decode!(event)
+
+          assert %{"notifications" => %{"last_read_id" => ^notification_id}} =
+                   Jason.decode!(payload)
+        end)
+
+      Notification.set_read_up_to(user, notification_id)
+      Task.await(task)
     end
   end
 

@@ -102,7 +102,8 @@ defmodule Pleroma.Search.DatabaseSearch do
           ^tsc,
           o.data,
           ^search_query
-        )
+        ),
+      order_by: [desc: :inserted_at]
     )
   end
 

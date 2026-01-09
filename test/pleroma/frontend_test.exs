@@ -9,7 +9,7 @@ defmodule Pleroma.FrontendTest do
   @dir "test/frontend_static_test"
 
   setup do
-    File.mkdir_p!(@dir)
+    Pleroma.Backports.mkdir_p!(@dir)
     clear_config([:instance, :static_dir], @dir)
 
     on_exit(fn ->
@@ -46,7 +46,7 @@ defmodule Pleroma.FrontendTest do
 
     folder = Path.join([@dir, "frontends", "pleroma", "fantasy"])
     previously_existing = Path.join([folder, "temp"])
-    File.mkdir_p!(folder)
+    Pleroma.Backports.mkdir_p!(folder)
     File.write!(previously_existing, "yey")
     assert File.exists?(previously_existing)
 

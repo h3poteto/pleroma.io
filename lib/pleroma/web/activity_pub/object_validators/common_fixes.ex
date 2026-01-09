@@ -4,6 +4,7 @@
 
 defmodule Pleroma.Web.ActivityPub.ObjectValidators.CommonFixes do
   alias Pleroma.EctoType.ActivityPub.ObjectValidators
+  alias Pleroma.Language.LanguageDetector
   alias Pleroma.Maps
   alias Pleroma.Object
   alias Pleroma.Object.Containment
@@ -19,7 +20,15 @@ defmodule Pleroma.Web.ActivityPub.ObjectValidators.CommonFixes do
   require Pleroma.Constants
 
   def cast_and_filter_recipients(message, field, follower_collection, field_fallback \\ []) do
-    {:ok, data} = ObjectValidators.Recipients.cast(message[field] || field_fallback)
+    # Fix as:Public/Public before ObjectID casting drops it, but keep `field_fallback`
+    # semantics (only used when the field is missing).
+    recipients =
+      %{field => message[field] || field_fallback}
+      |> Transmogrifier.fix_addressing_list(field)
+      |> Transmogrifier.fix_addressing_public(field)
+      |> Map.fetch!(field)
+
+    {:ok, data} = ObjectValidators.Recipients.cast(recipients)
 
     data =
       Enum.reject(data, fn x ->
@@ -151,10 +160,19 @@ defmodule Pleroma.Web.ActivityPub.ObjectValidators.CommonFixes do
   def maybe_add_language(object) do
     language =
       [
-        get_language_from_context(object),
-        get_language_from_content_map(object)
+        &get_language_from_context/1,
+        &get_language_from_content_map/1,
+        &get_language_from_content/1
       ]
-      |> Enum.find(&good_locale_code?(&1))
+      |> Enum.find_value(fn get_language ->
+        language = get_language.(object)
+
+        if good_locale_code?(language) do
+          language
+        else
+          nil
+        end
+      end)
 
     if language do
       Map.put(object, "language", language)
@@ -186,6 +204,12 @@ defmodule Pleroma.Web.ActivityPub.ObjectValidators.CommonFixes do
   end
 
   defp get_language_from_content_map(_), do: nil
+
+  defp get_language_from_content(%{"content" => content} = object) do
+    LanguageDetector.detect("#{object["summary"] || ""} #{content}")
+  end
+
+  defp get_language_from_content(_), do: nil
 
   def maybe_add_content_map(%{"language" => language, "content" => content} = object)
       when not_empty_string(language) do

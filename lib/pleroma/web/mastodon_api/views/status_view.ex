@@ -240,7 +240,7 @@ defmodule Pleroma.Web.MastodonAPI.StatusView do
   def render("show.json", %{activity: %{data: %{"object" => _object}} = activity} = opts) do
     object = Object.normalize(activity, fetch: false)
 
-    user = CommonAPI.get_user(activity.data["actor"])
+    user = CommonAPI.get_user(object.data["actor"])
     user_follower_address = user.follower_address
 
     like_count = object.data["like_count"] || 0
@@ -447,6 +447,7 @@ defmodule Pleroma.Web.MastodonAPI.StatusView do
       application: build_application(object.data["generator"]),
       language: get_language(object),
       emojis: build_emojis(object.data["emoji"]),
+      quotes_count: object.data["quotesCount"] || 0,
       pleroma: %{
         local: activity.local,
         conversation_id: get_context_id(activity),
@@ -602,7 +603,8 @@ defmodule Pleroma.Web.MastodonAPI.StatusView do
   def render("attachment.json", %{attachment: attachment}) do
     [attachment_url | _] = attachment["url"]
     media_type = attachment_url["mediaType"] || attachment_url["mimeType"] || "image"
-    href = attachment_url["href"] |> MediaProxy.url()
+    href_remote = attachment_url["href"]
+    href = href_remote |> MediaProxy.url()
     href_preview = attachment_url["href"] |> MediaProxy.preview_url()
     meta = render("attachment_meta.json", %{attachment: attachment})
 
@@ -641,7 +643,7 @@ defmodule Pleroma.Web.MastodonAPI.StatusView do
     %{
       id: attachment_id,
       url: href,
-      remote_url: href,
+      remote_url: href_remote,
       preview_url: href_preview,
       text_url: href,
       type: type,
@@ -679,6 +681,14 @@ defmodule Pleroma.Web.MastodonAPI.StatusView do
       ancestors: render("index.json", for: user, activities: ancestors, as: :activity),
       descendants: render("index.json", for: user, activities: descendants, as: :activity)
     }
+  end
+
+  def render("translation.json", %{
+        content: content,
+        detected_source_language: detected_source_language,
+        provider: provider
+      }) do
+    %{content: content, detected_source_language: detected_source_language, provider: provider}
   end
 
   def get_reply_to(activity, %{replied_to_activities: replied_to_activities}) do

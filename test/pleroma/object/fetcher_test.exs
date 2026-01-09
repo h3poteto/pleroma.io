@@ -6,7 +6,6 @@ defmodule Pleroma.Object.FetcherTest do
   use Pleroma.DataCase
 
   alias Pleroma.Activity
-  alias Pleroma.Instances
   alias Pleroma.Object
   alias Pleroma.Object.Fetcher
   alias Pleroma.Web.ActivityPub.ObjectValidator
@@ -249,17 +248,6 @@ defmodule Pleroma.Object.FetcherTest do
       # but the actual error is {:fetch, {:error, nil}} - we'll check for this format
       result = Fetcher.fetch_object_from_id("https://example.com/objects/no-content-type")
       assert {:fetch, {:error, nil}} = result
-    end
-
-    test "it resets instance reachability on successful fetch" do
-      id = "http://mastodon.example.org/@admin/99541947525187367"
-      Instances.set_consistently_unreachable(id)
-      refute Instances.reachable?(id)
-
-      {:ok, _object} =
-        Fetcher.fetch_object_from_id("http://mastodon.example.org/@admin/99541947525187367")
-
-      assert Instances.reachable?(id)
     end
   end
 

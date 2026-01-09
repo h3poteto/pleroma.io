@@ -1,0 +1,93 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    {
+      "ostatus": "http://ostatus.org#",
+      "atomUri": "ostatus:atomUri",
+      "inReplyToAtomUri": "ostatus:inReplyToAtomUri",
+      "conversation": "ostatus:conversation",
+      "sensitive": "as:sensitive",
+      "toot": "http://joinmastodon.org/ns#",
+      "votersCount": "toot:votersCount",
+      "quote": "https://w3id.org/fep/044f#quote",
+      "quoteUri": "http://fedibird.com/ns#quoteUri",
+      "_misskey_quote": "https://misskey-hub.net/ns#_misskey_quote",
+      "quoteAuthorization": {
+        "@id": "https://w3id.org/fep/044f#quoteAuthorization",
+        "@type": "@id"
+      },
+      "gts": "https://gotosocial.org/ns#",
+      "interactionPolicy": {
+        "@id": "gts:interactionPolicy",
+        "@type": "@id"
+      },
+      "canQuote": {
+        "@id": "gts:canQuote",
+        "@type": "@id"
+      },
+      "automaticApproval": {
+        "@id": "gts:automaticApproval",
+        "@type": "@id"
+      },
+      "manualApproval": {
+        "@id": "gts:manualApproval",
+        "@type": "@id"
+      }
+    }
+  ],
+  "id": "https://mastodon.social/users/gwynnion/statuses/115345489087257171",
+  "type": "Note",
+  "summary": null,
+  "inReplyTo": null,
+  "published": "2025-10-09T17:54:47Z",
+  "url": "https://mastodon.social/@gwynnion/115345489087257171",
+  "attributedTo": "https://mastodon.social/users/gwynnion",
+  "to": [
+    "https://www.w3.org/ns/activitystreams#Public"
+  ],
+  "cc": [
+    "https://mastodon.social/users/gwynnion/followers"
+  ],
+  "sensitive": false,
+  "atomUri": "https://mastodon.social/users/gwynnion/statuses/115345489087257171",
+  "inReplyToAtomUri": null,
+  "conversation": "https://mastodon.social/contexts/109836797527169643-115345489087257171",
+  "context": "https://mastodon.social/contexts/109836797527169643-115345489087257171",
+  "content": "<p class=\"quote-inline\">RE: <a href=\"https://mastodon.social/@404mediaco/115344945575874225\" target=\"_blank\" rel=\"nofollow noopener\" translate=\"no\"><span class=\"invisible\">https://</span><span class=\"ellipsis\">mastodon.social/@404mediaco/11</span><span class=\"invisible\">5344945575874225</span></a></p><p>Every age verification system is just a scheme for companies and hackers to steal your identity.</p>",
+  "contentMap": {
+    "en": "<p class=\"quote-inline\">RE: <a href=\"https://mastodon.social/@404mediaco/115344945575874225\" target=\"_blank\" rel=\"nofollow noopener\" translate=\"no\"><span class=\"invisible\">https://</span><span class=\"ellipsis\">mastodon.social/@404mediaco/11</span><span class=\"invisible\">5344945575874225</span></a></p><p>Every age verification system is just a scheme for companies and hackers to steal your identity.</p>"
+  },
+  "quote": "https://mastodon.social/users/404mediaco/statuses/115344945575874225",
+  "_misskey_quote": "https://mastodon.social/users/404mediaco/statuses/115344945575874225",
+  "quoteUri": "https://mastodon.social/users/404mediaco/statuses/115344945575874225",
+  "quoteAuthorization": "https://mastodon.social/users/404mediaco/quote_authorizations/115345489087269783",
+  "interactionPolicy": {
+    "canQuote": {
+      "automaticApproval": [
+        "https://www.w3.org/ns/activitystreams#Public"
+      ]
+    }
+  },
+  "attachment": [],
+  "tag": [],
+  "replies": {
+    "id": "https://mastodon.social/users/gwynnion/statuses/115345489087257171/replies",
+    "type": "Collection",
+    "first": {
+      "type": "CollectionPage",
+      "next": "https://mastodon.social/users/gwynnion/statuses/115345489087257171/replies?only_other_accounts=true&page=true",
+      "partOf": "https://mastodon.social/users/gwynnion/statuses/115345489087257171/replies",
+      "items": []
+    }
+  },
+  "likes": {
+    "id": "https://mastodon.social/users/gwynnion/statuses/115345489087257171/likes",
+    "type": "Collection",
+    "totalItems": 26
+  },
+  "shares": {
+    "id": "https://mastodon.social/users/gwynnion/statuses/115345489087257171/shares",
+    "type": "Collection",
+    "totalItems": 28
+  }
+}

@@ -402,28 +402,6 @@ defmodule Pleroma.Web.CommonAPI.Utils do
 
   def maybe_notify_mentioned_recipients(recipients, _), do: recipients
 
-  def maybe_notify_subscribers(
-        recipients,
-        %Activity{data: %{"actor" => actor, "type" => "Create"}} = activity
-      ) do
-    # Do not notify subscribers if author is making a reply
-    with %Object{data: object} <- Object.normalize(activity, fetch: false),
-         nil <- object["inReplyTo"],
-         %User{} = user <- User.get_cached_by_ap_id(actor) do
-      subscriber_ids =
-        user
-        |> User.subscriber_users()
-        |> Enum.filter(&Visibility.visible_for_user?(activity, &1))
-        |> Enum.map(& &1.ap_id)
-
-      recipients ++ subscriber_ids
-    else
-      _e -> recipients
-    end
-  end
-
-  def maybe_notify_subscribers(recipients, _), do: recipients
-
   def maybe_notify_followers(recipients, %Activity{data: %{"type" => "Move"}} = activity) do
     with %User{} = user <- User.get_cached_by_ap_id(activity.actor) do
       user
@@ -436,6 +414,27 @@ defmodule Pleroma.Web.CommonAPI.Utils do
   end
 
   def maybe_notify_followers(recipients, _), do: recipients
+
+  def get_notified_subscribers(
+        %Activity{data: %{"actor" => actor, "type" => "Create"}} = activity
+      ) do
+    # Do not notify subscribers if author is making a reply
+    with %Object{data: object} <- Object.normalize(activity, fetch: false),
+         nil <- object["inReplyTo"],
+         %User{} = user <- User.get_cached_by_ap_id(actor) do
+      subscriber_ids =
+        user
+        |> User.subscriber_users()
+        |> Enum.filter(&Visibility.visible_for_user?(activity, &1))
+        |> Enum.map(& &1.ap_id)
+
+      subscriber_ids
+    else
+      _e -> []
+    end
+  end
+
+  def get_notified_subscribers(_), do: []
 
   def maybe_extract_mentions(%{"tag" => tag}) do
     tag

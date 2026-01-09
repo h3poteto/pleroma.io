@@ -102,11 +102,19 @@ defmodule Pleroma.Factory do
 
     user = attrs[:user] || insert(:user)
 
+    object_id =
+      if attrs[:object_local] == false do
+        # Must not match our Endpoint URL in the test env
+        "https://example.com/objects/#{Ecto.UUID.generate()}"
+      else
+        Pleroma.Web.ActivityPub.Utils.generate_object_id()
+      end
+
     data = %{
       "type" => "Note",
       "content" => text,
       "source" => text,
-      "id" => Pleroma.Web.ActivityPub.Utils.generate_object_id(),
+      "id" => object_id,
       "actor" => user.ap_id,
       "to" => ["https://www.w3.org/ns/activitystreams#Public"],
       "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
@@ -297,27 +305,27 @@ defmodule Pleroma.Factory do
     featured_collection_activity(attrs, "Add")
   end
 
-  def remove_activity_factor(attrs \\ %{}) do
+  def remove_activity_factory(attrs \\ %{}) do
     featured_collection_activity(attrs, "Remove")
   end
 
   defp featured_collection_activity(attrs, type) do
     user = attrs[:user] || insert(:user)
-    note = attrs[:note] || insert(:note, user: user)
+    note_activity = attrs[:note_activity] || insert(:note_activity, user: user)
 
     data_attrs =
       attrs
       |> Map.get(:data_attrs, %{})
       |> Map.put(:type, type)
 
-    attrs = Map.drop(attrs, [:user, :note, :data_attrs])
+    attrs = Map.drop(attrs, [:user, :note_activity, :data_attrs])
 
     data =
       %{
         "id" => Pleroma.Web.ActivityPub.Utils.generate_activity_id(),
         "target" => user.featured_address,
-        "object" => note.data["object"],
-        "actor" => note.data["actor"],
+        "object" => note_activity.data["object"],
+        "actor" => note_activity.data["actor"],
         "type" => "Add",
         "to" => [Pleroma.Constants.as_public()],
         "cc" => [user.follower_address]
@@ -361,14 +369,25 @@ defmodule Pleroma.Factory do
 
   def note_activity_factory(attrs \\ %{}) do
     user = attrs[:user] || insert(:user)
-    note = attrs[:note] || insert(:note, user: user)
+    object_local = if attrs[:object_local] == false, do: false, else: true
+    note = attrs[:note] || insert(:note, user: user, object_local: object_local)
+
+    activity_id =
+      if attrs[:local] == false do
+        # Same domain as in note Object factory, it doesn't make sense
+        # to create mismatched Create Activities with an ID coming from
+        # a different domain than the Object
+        "https://example.com/activities/#{Ecto.UUID.generate()}"
+      else
+        Pleroma.Web.ActivityPub.Utils.generate_activity_id()
+      end
 
     data_attrs = attrs[:data_attrs] || %{}
-    attrs = Map.drop(attrs, [:user, :note, :data_attrs])
+    attrs = Map.drop(attrs, [:user, :note, :data_attrs, :object_local])
 
     data =
       %{
-        "id" => Pleroma.Web.ActivityPub.Utils.generate_activity_id(),
+        "id" => activity_id,
         "type" => "Create",
         "actor" => note.data["actor"],
         "to" => note.data["to"],
@@ -408,21 +427,45 @@ defmodule Pleroma.Factory do
 
   def announce_activity_factory(attrs \\ %{}) do
     note_activity = attrs[:note_activity] || insert(:note_activity)
+    object = Object.normalize(note_activity, fetch: false)
     user = attrs[:user] || insert(:user)
 
     data = %{
+      "id" => Pleroma.Web.ActivityPub.Utils.generate_activity_id(),
       "type" => "Announce",
-      "actor" => note_activity.actor,
-      "object" => note_activity.data["id"],
-      "to" => [user.follower_address, note_activity.data["actor"]],
+      "actor" => user.ap_id,
+      "object" => object.data["id"],
+      "to" => [user.follower_address, object.data["actor"]],
       "cc" => ["https://www.w3.org/ns/activitystreams#Public"],
-      "context" => note_activity.data["context"]
+      "context" => object.data["context"]
     }
 
     %Pleroma.Activity{
       data: data,
       actor: user.ap_id,
       recipients: data["to"]
+    }
+  end
+
+  def emoji_react_activity_factory(attrs \\ %{}) do
+    note_activity = attrs[:note_activity] || insert(:note_activity)
+    object = Object.normalize(note_activity, fetch: false)
+    user = attrs[:user] || insert(:user)
+
+    data = %{
+      "id" => Pleroma.Web.ActivityPub.Utils.generate_activity_id(),
+      "actor" => user.ap_id,
+      "type" => "EmojiReact",
+      "object" => object.data["id"],
+      "to" => [user.follower_address, object.data["actor"]],
+      "cc" => ["https://www.w3.org/ns/activitystreams#Public"],
+      "published_at" => DateTime.utc_now() |> DateTime.to_iso8601(),
+      "context" => object.data["context"],
+      "content" => "😀"
+    }
+
+    %Pleroma.Activity{
+      data: data
     }
   end
 

@@ -16,14 +16,18 @@ defmodule Pleroma.Web.PleromaAPI.ScrobbleController do
 
   plug(
     OAuthScopesPlug,
-    %{scopes: ["read"], fallback: :proceed_unauthenticated} when action == :index
+    %{scopes: ["read:scrobbles"], fallback: :proceed_unauthenticated} when action == :index
   )
 
-  plug(OAuthScopesPlug, %{scopes: ["write"]} when action == :create)
+  plug(OAuthScopesPlug, %{scopes: ["write:scrobbles"]} when action == :create)
 
   defdelegate open_api_operation(action), to: Pleroma.Web.ApiSpec.PleromaScrobbleOperation
 
   def create(%{assigns: %{user: user}, body_params: params} = conn, _) do
+    params =
+      params
+      |> Map.put_new(:external_link, Map.get(params, :externalLink))
+
     with {:ok, activity} <- CommonAPI.listen(user, params) do
       render(conn, "show.json", activity: activity, for: user)
     else

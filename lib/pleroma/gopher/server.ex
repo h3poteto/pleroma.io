@@ -22,14 +22,18 @@ defmodule Pleroma.Gopher.Server do
   def init([ip, port]) do
     Logger.info("Starting gopher server on #{port}")
 
-    :ranch.start_listener(
-      :gopher,
-      100,
-      :ranch_tcp,
-      [ip: ip, port: port],
-      __MODULE__.ProtocolHandler,
-      []
-    )
+    {:ok, _pid} =
+      :ranch.start_listener(
+        :gopher,
+        :ranch_tcp,
+        %{
+          num_acceptors: 100,
+          max_connections: 100,
+          socket_opts: [ip: ip, port: port]
+        },
+        __MODULE__.ProtocolHandler,
+        []
+      )
 
     {:ok, %{ip: ip, port: port}}
   end
@@ -43,13 +47,13 @@ defmodule Pleroma.Gopher.Server.ProtocolHandler do
   alias Pleroma.Web.ActivityPub.ActivityPub
   alias Pleroma.Web.ActivityPub.Visibility
 
-  def start_link(ref, socket, transport, opts) do
-    pid = spawn_link(__MODULE__, :init, [ref, socket, transport, opts])
+  def start_link(ref, transport, opts) do
+    pid = spawn_link(__MODULE__, :init, [ref, transport, opts])
     {:ok, pid}
   end
 
-  def init(ref, socket, transport, [] = _Opts) do
-    :ok = :ranch.accept_ack(ref)
+  def init(ref, transport, opts \\ []) do
+    {:ok, socket} = :ranch.handshake(ref, opts)
     loop(socket, transport)
   end
 

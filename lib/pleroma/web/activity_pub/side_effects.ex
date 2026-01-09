@@ -145,7 +145,7 @@ defmodule Pleroma.Web.ActivityPub.SideEffects do
       ) do
     with %User{} = blocker <- User.get_cached_by_ap_id(blocking_user),
          %User{} = blocked <- User.get_cached_by_ap_id(blocked_user) do
-      User.block(blocker, blocked)
+      User.block(blocker, blocked, Enum.into(meta, %{}))
     end
 
     {:ok, object, meta}

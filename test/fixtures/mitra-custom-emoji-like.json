@@ -1,0 +1,46 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://w3id.org/security/v1",
+    "https://w3id.org/security/data-integrity/v1",
+    {
+      "Emoji": "toot:Emoji",
+      "Hashtag": "as:Hashtag",
+      "sensitive": "as:sensitive",
+      "toot": "http://joinmastodon.org/ns#"
+    }
+  ],
+  "actor": "https://mitra.social/users/silverpill",
+  "cc": [],
+  "content": ":ablobcatheartsqueeze:",
+  "id": "https://mitra.social/activities/like/0195a89a-a3a0-ead4-3a1c-aa6311397cfd",
+  "object": "https://framapiaf.org/users/peertube/statuses/114182703352270287",
+  "proof": {
+    "created": "2025-03-18T09:34:21.610678375Z",
+    "cryptosuite": "eddsa-jcs-2022",
+    "proofPurpose": "assertionMethod",
+    "proofValue": "z5AvpwkXQGFpTneRVDNeF48Jo9qYG6PgrE5HaPPpQNdNyc31ULMN4Vxd4aFXELo4Rk5Y9hd9nDy254xP8v5uGGWp1",
+    "type": "DataIntegrityProof",
+    "verificationMethod": "https://mitra.social/users/silverpill#ed25519-key"
+  },
+  "tag": [
+    {
+      "attributedTo": "https://mitra.social/actor",
+      "icon": {
+        "mediaType": "image/png",
+        "type": "Image",
+        "url": "https://mitra.social/media/a08e153441b25e512ab1b2e8922f5d8cd928322c8b79958cd48297ac722a4117.png"
+      },
+      "id": "https://mitra.social/objects/emojis/ablobcatheartsqueeze",
+      "name": ":ablobcatheartsqueeze:",
+      "type": "Emoji",
+      "updated": "1970-01-01T00:00:00Z"
+    }
+  ],
+  "to": [
+    "https://framapiaf.org/users/peertube",
+    "https://www.w3.org/ns/activitystreams#Public"
+  ],
+  "type": "Like"
+}
+

@@ -4,7 +4,9 @@ defmodule Mix.Tasks.Pleroma.TestRunner do
   use Mix.Task
 
   def run(args \\ []) do
-    case System.cmd("mix", ["test"] ++ args, into: IO.stream(:stdio, :line)) do
+    case System.cmd("mix", ["test", "--warnings-as-errors"] ++ args,
+           into: IO.stream(:stdio, :line)
+         ) do
       {_, 0} ->
         :ok
 

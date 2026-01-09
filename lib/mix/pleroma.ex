@@ -26,7 +26,11 @@ defmodule Mix.Pleroma do
     Application.put_env(:phoenix, :serve_endpoints, false, persistent: true)
 
     unless System.get_env("DEBUG") do
-      Logger.remove_backend(:console)
+      try do
+        Logger.remove_backend(:console)
+      catch
+        :exit, _ -> :ok
+      end
     end
 
     adapter = Application.get_env(:tesla, :adapter)

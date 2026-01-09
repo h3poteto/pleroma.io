@@ -39,10 +39,12 @@ Has these additional fields under the `pleroma` object:
 - `emoji_reactions`: A list with emoji / reaction maps. The format is `{name: "☕", count: 1, me: true}`. Contains no information about the reacting users, for that use the `/statuses/:id/reactions` endpoint.
 - `parent_visible`: If the parent of this post is visible to the user or not.
 - `pinned_at`: a datetime (iso8601) when status was pinned, `null` otherwise.
-- `quotes_count`: the count of status quotes.
-- `non_anonymous`: true if the source post specifies the poll results are not anonymous. Currently only implemented by Smithereen.
 - `bookmark_folder`: the ID of the folder bookmark is stored within (if any).
 - `list_id`: the ID of the list the post is addressed to (if any, only returned to author).
+
+Has these additional fields under the `poll.pleroma` object:
+
+- `non_anonymous`: true if the source post specifies the poll results are not anonymous. Currently only implemented by Smithereen.
 
 The `GET /api/v1/statuses/:id/source` endpoint additionally has the following attributes:
 
@@ -88,6 +90,7 @@ The `id` parameter can also be the `nickname` of the user. This only works in th
 - `only_media`: include only statuses with media attached
 - `with_muted`: include statuses/reactions from muted accounts
 - `exclude_reblogs`: exclude reblogs
+- `only_reblogs`: include only reblogs
 - `exclude_replies`: exclude replies
 - `exclude_visibilities`: exclude visibilities
 
@@ -97,6 +100,9 @@ Endpoints which accept `with_relationships` parameter:
 - `/api/v1/accounts/:id/followers`
 - `/api/v1/accounts/:id/following`
 - `/api/v1/mutes`
+- `/api/v1/blocks`
+- `/api/v1/search`
+- `/api/v2/search`
 
 Has these additional fields under the `pleroma` object:
 

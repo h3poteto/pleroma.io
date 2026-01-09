@@ -31,14 +31,14 @@ defmodule Pleroma.Web.MastodonAPI.AccountController do
 
   plug(Pleroma.Web.ApiSpec.CastAndValidate, replace_params: false)
 
-  plug(:skip_auth when action in [:create, :lookup])
+  plug(:skip_auth when action in [:create])
 
   plug(:skip_public_check when action in [:show, :statuses])
 
   plug(
     OAuthScopesPlug,
     %{fallback: :proceed_unauthenticated, scopes: ["read:accounts"]}
-    when action in [:show, :followers, :following]
+    when action in [:show, :followers, :following, :lookup, :endorsements]
   )
 
   plug(
@@ -50,7 +50,7 @@ defmodule Pleroma.Web.MastodonAPI.AccountController do
   plug(
     OAuthScopesPlug,
     %{scopes: ["read:accounts"]}
-    when action in [:verify_credentials, :endorsements]
+    when action in [:verify_credentials, :endorsements, :own_endorsements]
   )
 
   plug(
@@ -89,7 +89,7 @@ defmodule Pleroma.Web.MastodonAPI.AccountController do
   @relationship_actions [:follow, :unfollow, :remove_from_followers]
   @needs_account ~W(
     followers following lists follow unfollow mute unmute block unblock
-    note endorse unendorse remove_from_followers
+    note endorse unendorse endorsements remove_from_followers
   )a
 
   plug(
@@ -501,8 +501,14 @@ defmodule Pleroma.Web.MastodonAPI.AccountController do
   end
 
   @doc "POST /api/v1/accounts/:id/block"
-  def block(%{assigns: %{user: blocker, account: blocked}} = conn, _params) do
-    with {:ok, _activity} <- CommonAPI.block(blocked, blocker) do
+  def block(
+        %{
+          assigns: %{user: blocker, account: blocked},
+          private: %{open_api_spex: %{body_params: params}}
+        } = conn,
+        _params
+      ) do
+    with {:ok, _activity} <- CommonAPI.block(blocked, blocker, params) do
       render(conn, "relationship.json", user: blocker, target: blocked)
     else
       {:error, message} -> json_response(conn, :forbidden, %{error: message})
@@ -547,6 +553,22 @@ defmodule Pleroma.Web.MastodonAPI.AccountController do
     else
       {:error, message} -> json_response(conn, :forbidden, %{error: message})
     end
+  end
+
+  @doc "GET /api/v1/accounts/:id/endorsements"
+  def endorsements(%{assigns: %{user: for_user, account: user}} = conn, params) do
+    users =
+      user
+      |> User.endorsed_users_relation(_restrict_deactivated = true)
+      |> Pleroma.Repo.all()
+
+    conn
+    |> render("index.json",
+      for: for_user,
+      users: users,
+      as: :user,
+      embed_relationships: embed_relationships?(params)
+    )
   end
 
   @doc "POST /api/v1/accounts/:id/remove_from_followers"
@@ -607,13 +629,19 @@ defmodule Pleroma.Web.MastodonAPI.AccountController do
       users: users,
       for: user,
       as: :user,
-      embed_relationships: embed_relationships?(params)
+      embed_relationships: embed_relationships?(params),
+      blocks: true
     )
   end
 
   @doc "GET /api/v1/accounts/lookup"
-  def lookup(%{private: %{open_api_spex: %{params: %{acct: nickname}}}} = conn, _params) do
-    with %User{} = user <- User.get_by_nickname(nickname) do
+  def lookup(
+        %{assigns: %{user: for_user}, private: %{open_api_spex: %{params: %{acct: nickname}}}} =
+          conn,
+        _params
+      ) do
+    with %User{} = user <- User.get_by_nickname(nickname),
+         :visible <- User.visible_for(user, for_user) do
       render(conn, "show.json",
         user: user,
         skip_visibility_check: true
@@ -624,7 +652,7 @@ defmodule Pleroma.Web.MastodonAPI.AccountController do
   end
 
   @doc "GET /api/v1/endorsements"
-  def endorsements(%{assigns: %{user: user}} = conn, params) do
+  def own_endorsements(%{assigns: %{user: user}} = conn, params) do
     users =
       user
       |> User.endorsed_users_relation(_restrict_deactivated = true)

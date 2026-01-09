@@ -49,8 +49,38 @@ defmodule Pleroma.Web.ActivityPub.ObjectViewTest do
       replies_uris = [self_reply1.object.data["id"]]
       result = ObjectView.render("object.json", %{object: refresh_record(activity)})
 
-      assert %{"type" => "Collection", "items" => ^replies_uris} =
+      assert %{
+               "type" => "OrderedCollection",
+               "id" => _,
+               "first" => %{"orderedItems" => ^replies_uris}
+             } =
                get_in(result, ["object", "replies"])
+    end
+
+    test "renders a replies collection on its own" do
+      user = insert(:user)
+      activity = insert(:note_activity, user: user)
+      activity = Pleroma.Activity.get_by_id_with_object(activity.id)
+
+      {:ok, r1} =
+        CommonAPI.post(user, %{status: "reply1", in_reply_to_status_id: activity.id})
+
+      {:ok, r2} =
+        CommonAPI.post(user, %{status: "reply1", in_reply_to_status_id: activity.id})
+
+      replies_uris = [r1.object.data["id"], r2.object.data["id"]]
+
+      result =
+        ObjectView.render("object_replies.json", %{
+          render_params: %{object_ap_id: activity.object.data["id"]}
+        })
+
+      %{
+        "type" => "OrderedCollection",
+        "id" => _,
+        "totalItems" => 2,
+        "first" => %{"orderedItems" => ^replies_uris}
+      } = result
     end
   end
 
@@ -94,5 +124,24 @@ defmodule Pleroma.Web.ActivityPub.ObjectViewTest do
     assert result["id"] == undo.data["id"]
     assert result["object"] == announce.data["id"]
     assert result["type"] == "Undo"
+  end
+
+  test "renders a listen activity" do
+    audio = insert(:audio)
+    user = insert(:user)
+
+    {:ok, listen_activity} = CommonAPI.listen(user, audio.data)
+
+    result = ObjectView.render("object.json", %{object: listen_activity})
+
+    assert result["id"] == listen_activity.data["id"]
+    assert result["to"] == listen_activity.data["to"]
+    assert result["type"] == "Listen"
+    assert result["object"]["album"] == listen_activity.data["album"]
+    assert result["object"]["artist"] == listen_activity.data["artist"]
+    assert result["object"]["length"] == listen_activity.data["length"]
+    assert result["object"]["title"] == listen_activity.data["title"]
+    assert result["object"]["type"] == "Audio"
+    assert result["@context"]
   end
 end

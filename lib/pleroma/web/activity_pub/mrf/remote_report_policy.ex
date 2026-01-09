@@ -15,7 +15,6 @@ defmodule Pleroma.Web.ActivityPub.MRF.RemoteReportPolicy do
     else
       {:local, true} -> {:ok, object}
       {:reject, message} -> {:reject, message}
-      error -> {:reject, error}
     end
   end
 

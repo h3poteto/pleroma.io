@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 
 defmodule Pleroma.Workers.ReceiverWorker do
+  alias Pleroma.Instances
   alias Pleroma.Signature
   alias Pleroma.User
   alias Pleroma.Web.Federator
@@ -37,6 +38,11 @@ defmodule Pleroma.Workers.ReceiverWorker do
          {:ok, _public_key} <- Signature.refetch_public_key(conn_data),
          {:signature, true} <- {:signature, Signature.validate_signature(conn_data)},
          {:ok, res} <- Federator.perform(:incoming_ap_doc, params) do
+      unless Instances.reachable?(params["actor"]) do
+        domain = URI.parse(params["actor"]).host
+        Oban.insert(Pleroma.Workers.ReachabilityWorker.new(%{"domain" => domain}))
+      end
+
       {:ok, res}
     else
       e -> process_errors(e)
@@ -45,6 +51,11 @@ defmodule Pleroma.Workers.ReceiverWorker do
 
   def perform(%Job{args: %{"op" => "incoming_ap_doc", "params" => params}}) do
     with {:ok, res} <- Federator.perform(:incoming_ap_doc, params) do
+      unless Instances.reachable?(params["actor"]) do
+        domain = URI.parse(params["actor"]).host
+        Oban.insert(Pleroma.Workers.ReachabilityWorker.new(%{"domain" => domain}))
+      end
+
       {:ok, res}
     else
       e -> process_errors(e)

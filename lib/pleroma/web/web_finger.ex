@@ -35,9 +35,9 @@ defmodule Pleroma.Web.WebFinger do
 
     regex =
       if webfinger_domain = Pleroma.Config.get([__MODULE__, :domain]) do
-        ~r/(acct:)?(?<username>[a-z0-9A-Z_\.-]+)@(#{host}|#{webfinger_domain})/
+        ~r/(acct:)?(?<username>[a-z0-9A-Z_\.-]+)@(#{host}|#{webfinger_domain})$/
       else
-        ~r/(acct:)?(?<username>[a-z0-9A-Z_\.-]+)@#{host}/
+        ~r/(acct:)?(?<username>[a-z0-9A-Z_\.-]+)@#{host}$/
       end
 
     with %{"username" => username} <- Regex.named_captures(regex, resource),
@@ -195,7 +195,9 @@ defmodule Pleroma.Web.WebFinger do
   defp get_address_from_domain(_, _), do: {:error, :webfinger_no_domain}
 
   @spec finger(String.t()) :: {:ok, map()} | {:error, any()}
-  def finger(account) do
+  def finger(account), do: do_finger(account, true)
+
+  defp do_finger(account, follow_redirects) do
     account = String.trim_leading(account, "@")
 
     domain =
@@ -229,8 +231,15 @@ defmodule Pleroma.Web.WebFinger do
           {:error, {:content_type, nil}}
       end
       |> case do
-        {:ok, data} -> validate_webfinger(address, data)
-        error -> error
+        {:ok, data} ->
+          if follow_redirects do
+            validate_webfinger(address, data)
+          else
+            {:ok, data}
+          end
+
+        error ->
+          error
       end
     else
       error ->
@@ -241,10 +250,8 @@ defmodule Pleroma.Web.WebFinger do
 
   defp validate_webfinger(request_url, %{"subject" => "acct:" <> acct = subject} = data) do
     with [_name, acct_host] <- String.split(acct, "@"),
-         {_, url} <- {:address, get_address_from_domain(acct_host, subject)},
-         %URI{host: request_host} <- URI.parse(request_url),
-         %URI{host: acct_host} <- URI.parse(url),
-         {_, true} <- {:hosts_match, acct_host == request_host} do
+         {_, resolved_url} <- {:address, get_address_from_domain(acct_host, subject)},
+         {_, true} <- {:url_match, resolved_webfinger_matches?(request_url, resolved_url, data)} do
       {:ok, data}
     else
       _ -> {:error, {:webfinger_invalid, request_url, data}}
@@ -252,4 +259,29 @@ defmodule Pleroma.Web.WebFinger do
   end
 
   defp validate_webfinger(url, data), do: {:error, {:webfinger_invalid, url, data}}
+
+  defp resolved_webfinger_matches?(request_url, resolved_url, _data)
+       when request_url == resolved_url do
+    true
+  end
+
+  defp resolved_webfinger_matches?(
+         _request_url,
+         _resolved_url,
+         %{"subject" => "acct:" <> acct} = data
+       ) do
+    with {:ok, %{"subject" => "acct:" <> new_acct} = new_data} <- do_finger(acct, false),
+         true <- acct == new_acct,
+         true <- webfinger_data_matches?(data, new_data) do
+      true
+    else
+      _ -> false
+    end
+  end
+
+  defp webfinger_data_matches?(%{"ap_id" => ap_id}, %{"ap_id" => ap_id}) when ap_id != "" do
+    true
+  end
+
+  defp webfinger_data_matches?(_data, _new_data), do: false
 end

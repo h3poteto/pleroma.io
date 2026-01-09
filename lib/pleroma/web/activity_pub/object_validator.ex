@@ -200,14 +200,13 @@ defmodule Pleroma.Web.ActivityPub.ObjectValidator do
   end
 
   def validate(%{"type" => type} = object, meta)
-      when type in ~w[Accept Reject Follow Update Like EmojiReact Announce
+      when type in ~w[Accept Reject Follow Like EmojiReact Announce
       ChatMessage Answer] do
     validator =
       case type do
         "Accept" -> AcceptRejectValidator
         "Reject" -> AcceptRejectValidator
         "Follow" -> FollowValidator
-        "Update" -> UpdateValidator
         "Like" -> LikeValidator
         "EmojiReact" -> EmojiReactValidator
         "Announce" -> AnnounceValidator
@@ -215,16 +214,19 @@ defmodule Pleroma.Web.ActivityPub.ObjectValidator do
         "Answer" -> AnswerValidator
       end
 
-    cast_func =
-      if type == "Update" do
-        fn o -> validator.cast_and_validate(o, meta) end
-      else
-        fn o -> validator.cast_and_validate(o) end
-      end
-
     with {:ok, object} <-
            object
-           |> cast_func.()
+           |> validator.cast_and_validate()
+           |> Ecto.Changeset.apply_action(:insert) do
+      object = stringify_keys(object)
+      {:ok, object, meta}
+    end
+  end
+
+  def validate(%{"type" => type} = object, meta) when type == "Update" do
+    with {:ok, object} <-
+           object
+           |> UpdateValidator.cast_and_validate(meta)
            |> Ecto.Changeset.apply_action(:insert) do
       object = stringify_keys(object)
       {:ok, object, meta}

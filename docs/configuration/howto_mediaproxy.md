@@ -16,7 +16,9 @@ location /proxy {
 ```
 Also add the following on top of the configuration, outside of the `server` block:
 ```
-proxy_cache_path /tmp/pleroma-media-cache levels=1:2 keys_zone=pleroma_media_cache:10m max_size=10g inactive=720m use_temp_path=off;
+# Note: The cache directory must exist and be writable by nginx.
+# If nginx runs in a chroot, create it inside the chroot.
+proxy_cache_path /var/tmp/pleroma-media-cache levels=1:2 keys_zone=pleroma_media_cache:10m max_size=10g inactive=720m use_temp_path=off;
 ```
 If you came here from one of the installation guides, take a look at the example configuration `/installation/pleroma.nginx`, where this part is already included.
 

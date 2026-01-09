@@ -4,8 +4,8 @@ defmodule Pleroma.Mixfile do
   def project do
     [
       app: :pleroma,
-      version: version("2.9.1"),
-      elixir: "~> 1.14",
+      version: version("2.10.0"),
+      elixir: "~> 1.15",
       elixirc_paths: elixirc_paths(Mix.env()),
       compilers: Mix.compilers(),
       elixirc_options: [warnings_as_errors: warnings_as_errors(), prune_code_paths: false],
@@ -42,20 +42,11 @@ defmodule Pleroma.Mixfile do
             eldap: :transient,
             opentelemetry: :temporary
           ],
-          steps: [:assemble, &put_otp_version/1, &copy_files/1, &copy_nginx_config/1],
+          steps: [:assemble, &copy_files/1, &copy_nginx_config/1],
           config_providers: [{Pleroma.Config.ReleaseRuntimeProvider, []}]
         ]
       ]
     ]
-  end
-
-  def put_otp_version(%{path: target_path} = release) do
-    File.write!(
-      Path.join([target_path, "OTP_VERSION"]),
-      Pleroma.OTPVersion.version()
-    )
-
-    release
   end
 
   def copy_files(%{path: target_path} = release) do
@@ -142,15 +133,18 @@ defmodule Pleroma.Mixfile do
       {:phoenix_ecto, "~> 4.4"},
       {:ecto_sql, "~> 3.10"},
       {:ecto_enum, "~> 1.4"},
-      {:postgrex, ">= 0.0.0"},
+      {:postgrex, ">= 0.20.0"},
       {:phoenix_html, "~> 3.3"},
       {:phoenix_live_view, "~> 0.19.0"},
       {:phoenix_live_dashboard, "~> 0.8.0"},
       {:telemetry_metrics, "~> 0.6"},
       {:telemetry_poller, "~> 1.0"},
       {:tzdata, "~> 1.0.3"},
-      {:plug_cowboy, "~> 2.5"},
-      {:oban, "~> 2.18.0"},
+      {:plug_cowboy, "~> 2.7"},
+      {:oban, "~> 2.19.0"},
+      {:oban_plugins_lazarus,
+       git: "https://git.pleroma.social/pleroma/elixir-libraries/oban_plugins_lazarus.git",
+       ref: "e49fc355baaf0e435208bf5f534d31e26e897711"},
       {:gettext, "~> 0.20"},
       {:bcrypt_elixir, "~> 2.2"},
       {:trailing_format_plug, "~> 0.0.7"},
@@ -160,8 +154,8 @@ defmodule Pleroma.Mixfile do
       {:cachex, "~> 3.2"},
       {:tesla, "~> 1.11"},
       {:castore, "~> 1.0"},
-      {:cowlib, "~> 2.9", override: true},
-      {:gun, "~> 2.0.0-rc.1", override: true},
+      {:cowlib, "~> 2.15"},
+      {:gun, "~> 2.2"},
       {:finch, "~> 0.15"},
       {:jason, "~> 1.2"},
       {:mogrify, "~> 0.9.0", override: "true"},
@@ -201,12 +195,12 @@ defmodule Pleroma.Mixfile do
        ref: "b647d0deecaa3acb140854fe4bda5b7e1dc6d1c8"},
       {:captcha,
        git: "https://git.pleroma.social/pleroma/elixir-libraries/elixir-captcha.git",
-       ref: "6630c42aaaab124e697b4e513190c89d8b64e410"},
+       ref: "e7b7cc34cc16b383461b966484c297e4ec9aeef6"},
       {:rollbax, github: "ForzaElixir/rollbax"},
       {:restarter, path: "./restarter"},
       {:majic, "~> 1.0"},
       {:open_api_spex, "~> 3.16"},
-      {:ecto_psql_extras, "~> 0.6"},
+      {:ecto_psql_extras, "~> 0.8"},
       {:vix, "~> 0.26.0"},
       {:elixir_make, "~> 0.7.7", override: true},
       {:blurhash, "~> 0.1.0", hex: :rinpatch_blurhash},
@@ -232,7 +226,7 @@ defmodule Pleroma.Mixfile do
       {:poison, "~> 3.0", only: :test},
       {:ex_doc, "~> 0.22", only: :dev, runtime: false},
       {:ex_machina, "~> 2.4", only: :test},
-      {:credo, "~> 1.6", only: [:dev, :test], runtime: false},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:mock, "~> 0.3.5", only: :test},
       {:covertool, "~> 2.0", only: :test},
       {:hackney, "~> 1.18.0", override: true},
@@ -253,7 +247,7 @@ defmodule Pleroma.Mixfile do
     [
       "ecto.setup": ["ecto.create", "ecto.migrate", "run priv/repo/seeds.exs"],
       "ecto.reset": ["ecto.drop", "ecto.setup"],
-      test: ["ecto.create --quiet", "ecto.migrate", "test"],
+      test: ["ecto.create --quiet", "ecto.migrate", "test --warnings-as-errors"],
       docs: ["pleroma.docs", "docs"],
       analyze: ["credo --strict --only=warnings,todo,fixme,consistency,readability"],
       copyright: &add_copyright/1,

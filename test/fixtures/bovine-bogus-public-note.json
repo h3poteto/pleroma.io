@@ -1,0 +1,34 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://w3id.org/security/v1",
+    "https://www.w3.org/ns/did/v1",
+    "https://w3id.org/security/multikey/v1",
+    {
+      "Hashtag": "as:Hashtag"
+    }
+  ],
+  "attributedTo": "https://mymath.rocks/endpoints/SYn3cl_N4HAPfPHgo2x37XunLEmhV9LnxCggcYwyec0",
+  "cc": [
+    "https://mymath.rocks/endpoints/30zoCe7haKBEFolH4rbAmKj-t9_bG0c2X2kMQkJk5qY",
+    "https://mastodon.social/users/nikclayton"
+  ],
+  "content": "<blockquote class=\"h-quote\">\n<p>I note that mymath.rocks does not provide this information.</p>\n</blockquote>\n<p>I&#39;m a big believer in &quot;Do as I say, not as I <strong>did</strong>&quot;.</p>\n<p>I could give a long list of technical reasons, which boil down to: nodeinfo is pretty nonsensical with the way I write stuff.</p>\n<p>I think the above statement also addresses a main failure of the Fediverse. People, e.g. me, would love to fix stuff. Unfortunately, we lack the focus to address a lot of issues, e.g. nodeinfo sucks. So stuff gets done in a broken way.</p>\n<p>I think the main challenge the Fediverse has faced, and failed at, is avoiding the above situation. To continue the example, there is no way for somebody to say: Let&#39;s fix nodeinfo and people will follow their ideas.</p>\n",
+  "id": "https://mymath.rocks/objects/2b89e564-30cf-4eeb-97ca-7e638a154026",
+  "inReplyTo": "https://mastodon.social/users/nikclayton/statuses/115496665258618127",
+  "likes": "https://mymath.rocks/objects/2b89e564-30cf-4eeb-97ca-7e638a154026/likes",
+  "published": "2025-11-06T08:21:17.790Z",
+  "replies": "https://mymath.rocks/objects/2b89e564-30cf-4eeb-97ca-7e638a154026/replies",
+  "shares": "https://mymath.rocks/objects/2b89e564-30cf-4eeb-97ca-7e638a154026/shares",
+  "source": {
+    "content": "> I note that mymath.rocks does not provide this information.\n\nI'm a big believer in \"Do as I say, not as I __did__\".\n\nI could give a long list of technical reasons, which boil down to: nodeinfo is pretty nonsensical with the way I write stuff.\n\nI think the above statement also addresses a main failure of the Fediverse. People, e.g. me, would love to fix stuff. Unfortunately, we lack the focus to address a lot of issues, e.g. nodeinfo sucks. So stuff gets done in a broken way.\n\nI think the main challenge the Fediverse has faced, and failed at, is avoiding the above situation. To continue the example, there is no way for somebody to say: Let's fix nodeinfo and people will follow their ideas.",
+    "mediaType": "text/markdown"
+  },
+  "tag": {
+    "href": "https://mastodon.social/users/nikclayton",
+    "name": "https://mastodon.social/users/nikclayton",
+    "type": "Mention"
+  },
+  "to": "as:Public",
+  "type": "Note"
+}

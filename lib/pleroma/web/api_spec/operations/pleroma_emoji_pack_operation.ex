@@ -127,6 +127,20 @@ defmodule Pleroma.Web.ApiSpec.PleromaEmojiPackOperation do
     }
   end
 
+  def download_zip_operation do
+    %Operation{
+      tags: ["Emoji pack administration"],
+      summary: "Download a pack from a URL or an uploaded file",
+      operationId: "PleromaAPI.EmojiPackController.download_zip",
+      security: [%{"oAuth" => ["admin:write"]}],
+      requestBody: request_body("Parameters", download_zip_request(), required: true),
+      responses: %{
+        200 => ok_response(),
+        400 => Operation.response("Bad Request", "application/json", ApiError)
+      }
+    }
+  end
+
   defp download_request do
     %Schema{
       type: :object,
@@ -139,6 +153,25 @@ defmodule Pleroma.Web.ApiSpec.PleromaEmojiPackOperation do
         },
         name: %Schema{type: :string, format: :uri, description: "Pack Name"},
         as: %Schema{type: :string, format: :uri, description: "Save as"}
+      }
+    }
+  end
+
+  defp download_zip_request do
+    %Schema{
+      type: :object,
+      required: [:name],
+      properties: %{
+        url: %Schema{
+          type: :string,
+          format: :uri,
+          description: "URL of the file"
+        },
+        file: %Schema{
+          description: "The uploaded ZIP file",
+          type: :object
+        },
+        name: %Schema{type: :string, format: :uri, description: "Pack Name"}
       }
     }
   end

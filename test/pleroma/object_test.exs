@@ -156,7 +156,7 @@ defmodule Pleroma.ObjectTest do
 
       uploads_dir = Pleroma.Config.get!([Pleroma.Uploaders.Local, :uploads])
 
-      File.mkdir_p!(uploads_dir)
+      Pleroma.Backports.mkdir_p!(uploads_dir)
 
       file = %Plug.Upload{
         content_type: "image/jpeg",

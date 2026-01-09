@@ -308,4 +308,37 @@ defmodule Pleroma.ModerationLogTest do
       assert log.data["message"] == "@#{moderator.nickname} deleted status ##{note.id}"
     end
   end
+
+  describe "get_log_entry_message/1" do
+    setup do
+      moderator = insert(:user, is_moderator: true)
+      [moderator: moderator]
+    end
+
+    test "handles unknown action types gracefully", %{moderator: moderator} do
+      log_entry = %ModerationLog{
+        data: %{
+          "actor" => %{"nickname" => moderator.nickname},
+          "action" => "unknown_action",
+          "some_data" => "test_value"
+        }
+      }
+
+      assert ModerationLog.get_log_entry_message(log_entry) =~ moderator.nickname
+      assert ModerationLog.get_log_entry_message(log_entry) =~ "unknown_action"
+    end
+
+    test "handles malformed log entries gracefully" do
+      log_entry = %ModerationLog{
+        data: %{
+          "action" => "force_password_reset"
+          # Missing "actor" and "subject" fields
+        }
+      }
+
+      message = ModerationLog.get_log_entry_message(log_entry)
+      assert is_binary(message)
+      assert message =~ "force_password_reset"
+    end
+  end
 end

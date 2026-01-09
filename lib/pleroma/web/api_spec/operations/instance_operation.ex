@@ -52,7 +52,30 @@ defmodule Pleroma.Web.ApiSpec.InstanceOperation do
       summary: "Retrieve list of instance rules",
       operationId: "InstanceController.rules",
       responses: %{
-        200 => Operation.response("Array of domains", "application/json", array_of_rules())
+        200 => Operation.response("Array of rules", "application/json", array_of_rules())
+      }
+    }
+  end
+
+  def translation_languages_operation do
+    %Operation{
+      tags: ["Instance misc"],
+      summary: "Retrieve supported languages matrix",
+      operationId: "InstanceController.translation_languages",
+      responses: %{
+        200 =>
+          Operation.response(
+            "Translation languages matrix",
+            "application/json",
+            %Schema{
+              type: :object,
+              additionalProperties: %Schema{
+                type: :array,
+                items: %Schema{type: :string},
+                description: "Supported target languages for a source language"
+              }
+            }
+          )
       }
     }
   end

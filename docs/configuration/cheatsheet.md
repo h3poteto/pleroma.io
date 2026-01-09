@@ -733,13 +733,11 @@ An example for SMTP adapter:
 ```elixir
 config :pleroma, Pleroma.Emails.Mailer,
   enabled: true,
-  adapter: Swoosh.Adapters.SMTP,
+  adapter: Swoosh.Adapters.Mua,
   relay: "smtp.gmail.com",
-  username: "YOUR_USERNAME@gmail.com",
-  password: "YOUR_SMTP_PASSWORD",
+  auth: [username: "YOUR_USERNAME@gmail.com", password: "YOUR_SMTP_PASSWORD"],
   port: 465,
-  ssl: true,
-  auth: :always
+  protocol: :ssl
 ```
 
 An example for Mua adapter:
@@ -906,20 +904,30 @@ config :logger, :console,
 
 ### RUM indexing for full text search
 
-!!! warning
-    It is recommended to use PostgreSQL v11 or newer. We have seen some minor issues with lower PostgreSQL versions.
-
 * `rum_enabled`: If RUM indexes should be used. Defaults to `false`.
 
-RUM indexes are an alternative indexing scheme that is not included in PostgreSQL by default. While they may eventually be mainlined, for now they have to be installed as a PostgreSQL extension from https://github.com/postgrespro/rum.
+RUM indexes are an alternative indexing scheme that is not included in PostgreSQL by default. While they may eventually be mainlined, for now they have to be installed as a PostgreSQL extension from [https://github.com/postgrespro/rum](https://github.com/postgrespro/rum).
 
-Their advantage over the standard GIN indexes is that they allow efficient ordering of search results by timestamp, which makes search queries a lot faster on larger servers, by one or two orders of magnitude. They take up around 3 times as much space as GIN indexes.
+Their advantage over the standard GIN indexes is that they allow efficient ordering of search results by timestamp, which makes search queries a lot faster on larger servers, by one or two orders of magnitude. They take up around 3-4 times as much space as GIN indexes.
 
 To enable them, both the `rum_enabled` flag has to be set and the following special migration has to be run:
 
-`mix ecto.migrate --migrations-path priv/repo/optional_migrations/rum_indexing/`
+  * Source install:
+    - Stop Pleroma
+    - `mix ecto.migrate --migrations-path priv/repo/optional_migrations/rum_indexing/`
+  * OTP install:
+    - Stop Pleroma
+    - `pleroma_ctl migrate --migrations-path priv/repo/optional_migrations/rum_indexing/`
 
 This will probably take a long time.
+
+!!! note
+    It is recommended to `VACUUM FULL` the objects table after the migration has completed, to do that run:
+    ```
+    # sudo -Hu postgres vacuumdb --full --analyze -t objects <pleroma DB name>
+    ```
+
+Now you can start Pleroma back up.
 
 ## Alternative client protocols
 

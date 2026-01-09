@@ -6,6 +6,7 @@ defmodule Pleroma.Web.ActivityPub.Transmogrifier do
   @moduledoc """
   A module to handle coding from internal to wire ActivityPub and back.
   """
+  @behaviour Pleroma.Web.ActivityPub.Transmogrifier.API
   alias Pleroma.Activity
   alias Pleroma.EctoType.ActivityPub.ObjectValidators
   alias Pleroma.Maps
@@ -22,7 +23,6 @@ defmodule Pleroma.Web.ActivityPub.Transmogrifier do
   alias Pleroma.Web.ActivityPub.Visibility
   alias Pleroma.Web.Federator
 
-  import Ecto.Query
   import Pleroma.Web.Utils.Guards, only: [not_empty_string: 1]
 
   require Pleroma.Constants
@@ -103,6 +103,24 @@ defmodule Pleroma.Web.ActivityPub.Transmogrifier do
     end
   end
 
+  @doc """
+  Bovine compatibility
+  https://codeberg.org/bovine/bovine/issues/53
+  """
+  def fix_addressing_public(map, field) do
+    addrs = Map.get(map, field, []) |> List.wrap()
+
+    Map.put(
+      map,
+      field,
+      Enum.map(addrs, fn
+        "Public" -> Pleroma.Constants.as_public()
+        "as:Public" -> Pleroma.Constants.as_public()
+        x -> x
+      end)
+    )
+  end
+
   # if directMessage flag is set to true, leave the addressing alone
   def fix_explicit_addressing(%{"directMessage" => true} = object, _follower_collection),
     do: object
@@ -160,6 +178,10 @@ defmodule Pleroma.Web.ActivityPub.Transmogrifier do
     |> fix_addressing_list("cc")
     |> fix_addressing_list("bto")
     |> fix_addressing_list("bcc")
+    |> fix_addressing_public("to")
+    |> fix_addressing_public("cc")
+    |> fix_addressing_public("bto")
+    |> fix_addressing_public("bcc")
     |> fix_explicit_addressing(follower_collection)
     |> fix_implicit_addressing(follower_collection)
   end
@@ -495,12 +517,24 @@ defmodule Pleroma.Web.ActivityPub.Transmogrifier do
   defp handle_incoming_normalized(
          %{
            "type" => "Like",
+           "content" => content
+         } = data,
+         options
+       )
+       when is_binary(content) do
+    data
+    |> Map.put("type", "EmojiReact")
+    |> handle_incoming_normalized(options)
+  end
+
+  defp handle_incoming_normalized(
+         %{
+           "type" => "Like",
            "_misskey_reaction" => reaction
          } = data,
          options
        ) do
     data
-    |> Map.put("type", "EmojiReact")
     |> Map.put("content", @misskey_reactions[reaction] || reaction)
     |> handle_incoming_normalized(options)
   end
@@ -652,6 +686,24 @@ defmodule Pleroma.Web.ActivityPub.Transmogrifier do
     end
   end
 
+  # Rewrite dislikes into the thumbs down emoji
+  defp handle_incoming_normalized(%{"type" => "Dislike"} = data, options) do
+    data
+    |> Map.put("type", "EmojiReact")
+    |> Map.put("content", "👎")
+    |> handle_incoming_normalized(options)
+  end
+
+  defp handle_incoming_normalized(
+         %{"type" => "Undo", "object" => %{"type" => "Dislike"}} = data,
+         options
+       ) do
+    data
+    |> put_in(["object", "type"], "EmojiReact")
+    |> put_in(["object", "content"], "👎")
+    |> handle_incoming_normalized(options)
+  end
+
   defp handle_incoming_normalized(_, _), do: :error
 
   @spec get_obj_helper(String.t(), Keyword.t()) :: {:ok, Object.t()} | nil
@@ -709,48 +761,26 @@ defmodule Pleroma.Web.ActivityPub.Transmogrifier do
   def set_quote_url(obj), do: obj
 
   @doc """
-  Serialized Mastodon-compatible `replies` collection containing _self-replies_.
-  Based on Mastodon's ActivityPub::NoteSerializer#replies.
+  Inline first page of the `replies` collection,
+  containing any replies in chronological order.
   """
-  def set_replies(obj_data) do
-    replies_uris =
-      with limit when limit > 0 <-
-             Pleroma.Config.get([:activitypub, :note_replies_output_limit], 0),
-           %Object{} = object <- Object.get_cached_by_ap_id(obj_data["id"]) do
-        object
-        |> Object.self_replies()
-        |> select([o], fragment("?->>'id'", o.data))
-        |> limit(^limit)
-        |> Repo.all()
-      else
-        _ -> []
-      end
-
-    set_replies(obj_data, replies_uris)
+  def set_replies(%{"type" => type} = obj_data)
+      when type in Pleroma.Constants.status_object_types() do
+    with obj_ap_id when is_binary(obj_ap_id) <- obj_data["id"],
+         limit when limit > 0 <-
+           Pleroma.Config.get([:activitypub, :note_replies_output_limit], 0),
+         collection <-
+           Pleroma.Web.ActivityPub.ObjectView.render("object_replies.json", %{
+             render_params: %{object_ap_id: obj_data["id"], limit: limit, skip_ap_ctx: true}
+           }) do
+      Map.put(obj_data, "replies", collection)
+    else
+      0 -> Map.put(obj_data, "replies", obj_data["id"] <> "/replies")
+      _ -> obj_data
+    end
   end
 
-  defp set_replies(obj, []) do
-    obj
-  end
-
-  defp set_replies(obj, replies_uris) do
-    replies_collection = %{
-      "type" => "Collection",
-      "items" => replies_uris
-    }
-
-    Map.merge(obj, %{"replies" => replies_collection})
-  end
-
-  def replies(%{"replies" => %{"first" => %{"items" => items}}}) when not is_nil(items) do
-    items
-  end
-
-  def replies(%{"replies" => %{"items" => items}}) when not is_nil(items) do
-    items
-  end
-
-  def replies(_), do: []
+  def set_replies(obj_data), do: obj_data
 
   # Prepares the object of an outgoing create activity.
   def prepare_object(object) do
@@ -820,6 +850,27 @@ defmodule Pleroma.Web.ActivityPub.Transmogrifier do
     {:ok, data}
   end
 
+  def prepare_outgoing(%{"type" => "Update", "object" => %{"type" => objtype} = object} = data)
+      when objtype in Pleroma.Constants.actor_types() do
+    object =
+      object
+      |> maybe_fix_user_object()
+      |> strip_internal_fields()
+
+    data =
+      data
+      |> Map.put("object", object)
+      |> strip_internal_fields()
+      |> Map.merge(Utils.make_json_ld_header(object))
+      |> Map.delete("bcc")
+
+    {:ok, data}
+  end
+
+  def prepare_outgoing(%{"type" => "Update", "object" => %{}} = data) do
+    raise "Requested to serve an Update for non-updateable object type:  #{inspect(data)}"
+  end
+
   def prepare_outgoing(%{"type" => "Announce", "actor" => ap_id, "object" => object_id} = data) do
     object =
       object_id
@@ -876,6 +927,14 @@ defmodule Pleroma.Web.ActivityPub.Transmogrifier do
         |> Map.merge(Utils.make_json_ld_header())
 
       {:ok, data}
+    end
+  end
+
+  def prepare_outgoing(%{"type" => "Flag"} = data) do
+    with {:ok, stripped_activity} <- Utils.strip_report_status_data(data),
+         stripped_activity <- Utils.maybe_anonymize_reporter(stripped_activity),
+         stripped_activity <- Map.merge(stripped_activity, Utils.make_json_ld_header()) do
+      {:ok, stripped_activity}
     end
   end
 

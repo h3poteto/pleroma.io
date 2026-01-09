@@ -169,6 +169,18 @@ defmodule Pleroma.Web.ActivityPub.UserViewTest do
       user = Map.merge(user, %{hide_followers_count: false, hide_followers: true})
       assert %{"totalItems" => 1} = UserView.render("followers.json", %{user: user})
     end
+
+    test "does not hide follower items based on `hide_follows`" do
+      user = insert(:user)
+      follower = insert(:user)
+      {:ok, user, _follower, _activity} = CommonAPI.follow(user, follower)
+
+      user = Map.merge(user, %{hide_followers: false, hide_follows: true})
+      follower_ap_id = follower.ap_id
+
+      assert %{"first" => %{"orderedItems" => [^follower_ap_id]}} =
+               UserView.render("followers.json", %{user: user})
+    end
   end
 
   describe "following" do
