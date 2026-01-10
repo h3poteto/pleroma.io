@@ -54,4 +54,5 @@ jobs:
         mix ecto.create
         mix ecto.migrate
     - name: Run tests
-      run: mix test --cover --preload-modules
+      # Exclude flaky tests
+      run: mix test --cover --preload-modules --max-cases 1

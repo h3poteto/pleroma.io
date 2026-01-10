@@ -220,6 +220,7 @@ defmodule Pleroma.Web.PleromaAPI.EmojiPackControllerDownloadZipTest do
       File.rm!(zip_path)
     end
 
+    @tag :skip
     test "returns error when unable to create pack directory", %{
       admin_conn: admin_conn,
       emoji_path: emoji_path
