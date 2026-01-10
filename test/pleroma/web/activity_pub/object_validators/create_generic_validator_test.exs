@@ -59,4 +59,37 @@ defmodule Pleroma.Web.ActivityPub.ObjectValidators.CreateGenericValidatorTest do
     assert validated.valid?
     assert {:context, note["context"]} in validated.changes
   end
+
+  test "a Create/Note without addressing falls back to the Note's recipients" do
+    user = insert(:user)
+
+    note = %{
+      "id" => Utils.generate_object_id(),
+      "type" => "Note",
+      "actor" => user.ap_id,
+      "to" => [user.follower_address],
+      "cc" => [],
+      "content" => "Hello world",
+      "context" => Utils.generate_context_id()
+    }
+
+    note_activity = %{
+      "id" => Utils.generate_activity_id(),
+      "type" => "Create",
+      "actor" => note["actor"],
+      "object" => note,
+      "published" => DateTime.utc_now() |> DateTime.to_iso8601(),
+      "context" => Utils.generate_context_id()
+    }
+
+    # Build metadata
+    {:ok, object_data} = ObjectValidator.cast_and_apply(note_activity["object"])
+    meta = [object_data: ObjectValidator.stringify_keys(object_data)]
+
+    validated = CreateGenericValidator.cast_and_validate(note_activity, meta)
+
+    assert validated.valid?
+    assert Ecto.Changeset.get_field(validated, :to) == note["to"]
+    assert Ecto.Changeset.get_field(validated, :cc) == note["cc"]
+  end
 end

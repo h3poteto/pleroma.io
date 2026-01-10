@@ -168,9 +168,9 @@ defmodule Pleroma.Web.MastodonAPI.AccountView do
         UserRelationship.exists?(
           user_relationships,
           :endorsement,
-          target,
           reading_user,
-          &User.endorses?(&2, &1)
+          target,
+          &User.endorses?(&1, &2)
         )
     }
   end
@@ -340,6 +340,7 @@ defmodule Pleroma.Web.MastodonAPI.AccountView do
     |> maybe_put_unread_notification_count(user, opts[:for])
     |> maybe_put_email_address(user, opts[:for])
     |> maybe_put_mute_expires_at(user, opts[:for], opts)
+    |> maybe_put_block_expires_at(user, opts[:for], opts)
     |> maybe_show_birthday(user, opts[:for])
   end
 
@@ -475,6 +476,16 @@ defmodule Pleroma.Web.MastodonAPI.AccountView do
   end
 
   defp maybe_put_mute_expires_at(data, _, _, _), do: data
+
+  defp maybe_put_block_expires_at(data, %User{} = user, target, %{blocks: true}) do
+    Map.put(
+      data,
+      :block_expires_at,
+      UserRelationship.get_block_expire_date(target, user)
+    )
+  end
+
+  defp maybe_put_block_expires_at(data, _, _, _), do: data
 
   defp maybe_show_birthday(data, %User{id: user_id} = user, %User{id: user_id}) do
     data

@@ -70,6 +70,8 @@ The `/api/v1/pleroma/admin/*` path is backwards compatible with `/api/pleroma/ad
   - `nicknames`
 - Response: Array of user nicknames
 
+## `POST /api/v1/pleroma/admin/users`
+
 ### Create a user
 
 - Method: `POST`
@@ -81,7 +83,7 @@ The `/api/v1/pleroma/admin/*` path is backwards compatible with `/api/pleroma/ad
       `password`
     }
   ]
-- Response: User’s nickname
+- Response: Array of user objects
 
 ## `POST /api/v1/pleroma/admin/users/follow`
 

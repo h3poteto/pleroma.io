@@ -17,6 +17,7 @@ defmodule Pleroma.Web.MastodonAPI.StatusControllerTest do
   alias Pleroma.User
   alias Pleroma.Web.ActivityPub.ActivityPub
   alias Pleroma.Web.ActivityPub.Utils
+  alias Pleroma.Web.ActivityPub.Visibility
   alias Pleroma.Web.CommonAPI
   alias Pleroma.Workers.ScheduledActivityWorker
 
@@ -265,6 +266,73 @@ defmodule Pleroma.Web.MastodonAPI.StatusControllerTest do
                  "error" => "The message visibility must be direct"
                }
       end)
+    end
+
+    test "replying to a post the current user can't access fails", %{user: user, conn: conn} do
+      stranger = insert(:user)
+
+      {:ok, priv_post_act} =
+        CommonAPI.post(stranger, %{status: "forbidden knowledge", visibility: "private"})
+
+      assert Visibility.visible_for_user?(priv_post_act, stranger)
+      refute Visibility.visible_for_user?(priv_post_act, user)
+
+      resp =
+        conn
+        |> put_req_header("content-type", "application/json")
+        |> post("/api/v1/statuses", %{
+          "status" => "@#{stranger.nickname} :peek:",
+          "in_reply_to_id" => priv_post_act.id,
+          "visibility" => "private"
+        })
+        |> json_response_and_validate_schema(422)
+
+      assert match?(%{"error" => _}, resp)
+    end
+
+    test "replying to own DM succeeds", %{user: user, conn: conn} do
+      # this is an "edge" case for visibility: replying user is not
+      # part of addressed users (but is the author)
+      stranger = insert(:user)
+
+      {:ok, %{id: dm_id} = dm_post_act} =
+        CommonAPI.post(user, %{
+          status: "@#{stranger.nickname} wanna lose your mind to forbidden knowledge?",
+          visibility: "direct"
+        })
+
+      assert Visibility.visible_for_user?(dm_post_act, stranger)
+      assert Visibility.visible_for_user?(dm_post_act, user)
+
+      resp =
+        conn
+        |> put_req_header("content-type", "application/json")
+        |> post("/api/v1/statuses", %{
+          "status" => "@#{stranger.nickname} :peek:",
+          "in_reply_to_id" => dm_id,
+          "visibility" => "direct"
+        })
+        |> json_response_and_validate_schema(200)
+
+      assert match?(%{"in_reply_to_id" => ^dm_id}, resp)
+    end
+
+    test "replying to a non-post activity fails", %{conn: conn, user: user} do
+      other_user = insert(:user)
+
+      {:ok, _, _, follow_activity} = CommonAPI.follow(other_user, user)
+      assert Visibility.visible_for_user?(follow_activity, user)
+
+      conn =
+        conn
+        |> put_req_header("content-type", "application/json")
+        |> post("/api/v1/statuses", %{
+          "status" => "hiiii!",
+          "in_reply_to_id" => to_string(follow_activity.id)
+        })
+
+      assert %{"error" => "Can only reply to posts, not \"Follow\" activities"} =
+               json_response_and_validate_schema(conn, 422)
     end
 
     test "posting a status with an invalid in_reply_to_id", %{conn: conn} do
@@ -759,9 +827,17 @@ defmodule Pleroma.Web.MastodonAPI.StatusControllerTest do
   end
 
   defp local_and_remote_activities do
+    remote_user = insert(:user, local: false, domain: "example.com")
+    announce_user = insert(:user)
     local = insert(:note_activity)
-    remote = insert(:note_activity, local: false)
-    {:ok, local: local, remote: remote}
+    remote = insert(:note_activity, local: false, object_local: false, user: remote_user)
+    remote_note = insert(:note_activity, local: false, object_local: false)
+
+    local_activity_remote_object =
+      insert(:announce_activity, note_activity: remote_note, user: announce_user)
+
+    {:ok,
+     local: local, remote: remote, local_activity_remote_object: local_activity_remote_object}
   end
 
   defp local_and_remote_context_activities do
@@ -804,7 +880,64 @@ defmodule Pleroma.Web.MastodonAPI.StatusControllerTest do
     {:ok, job} = Pleroma.Web.Federator.incoming_ap_doc(params)
     {:ok, remote_activity} = ObanHelpers.perform(job)
 
-    %{locals: [id1, id2], remote: remote_activity.id, context: context}
+    {:ok, %{id: local_to_local_react_id}} = CommonAPI.react_with_emoji(id1, local_user_2, "🦊")
+
+    {:ok, %{id: local_to_remote_react_id}} =
+      CommonAPI.react_with_emoji(remote_activity.id, local_user_1, "🦊")
+
+    {:ok, %{id: remote_to_local_react_id}} = CommonAPI.react_with_emoji(id1, remote_user, "🦊")
+
+    {:ok, %{id: remote_to_remote_react_id}} =
+      CommonAPI.react_with_emoji(remote_activity.id, remote_user, "🦊")
+
+    %{
+      locals: [id1, id2],
+      remote: remote_activity.id,
+      local_interactions: [local_to_local_react_id, local_to_remote_react_id],
+      remote_interactions: [remote_to_local_react_id, remote_to_remote_react_id],
+      context: context
+    }
+  end
+
+  defp extract_activity_ids_from_response(list) when is_list(list) do
+    list
+    |> Enum.map(& &1["id"])
+  end
+
+  defp all_ids_included?(checked, authority) when is_list(checked) and is_list(authority) do
+    set1 = MapSet.new(checked)
+    set2 = MapSet.new(authority)
+    MapSet.equal?(set1, set2)
+  end
+
+  defp local_interactions_to_remote do
+    interacted_user = insert(:user, local: false, domain: "example.com")
+    interacting_user = insert(:user)
+
+    announced_post =
+      insert(:note_activity, local: false, object_local: false, user: interacted_user)
+
+    emoji_reacted_post =
+      insert(:note_activity, local: false, object_local: false, user: interacted_user)
+
+    favorited_post =
+      insert(:note_activity, local: false, object_local: false, user: interacted_user)
+
+    announce = insert(:announce_activity, note_activity: announced_post, user: interacting_user)
+
+    emoji_react =
+      insert(:emoji_react_activity, note_activity: emoji_reacted_post, user: interacting_user)
+
+    {:ok, favorite} = CommonAPI.favorite(favorited_post.id, interacting_user)
+
+    {
+      :ok,
+      announce: announce,
+      emoji_react: emoji_react,
+      favorite: favorite,
+      interacted: interacted_user,
+      interacter: interacting_user
+    }
   end
 
   describe "status with restrict unauthenticated activities for local and remote" do
@@ -814,7 +947,12 @@ defmodule Pleroma.Web.MastodonAPI.StatusControllerTest do
 
     setup do: clear_config([:restrict_unauthenticated, :activities, :remote], true)
 
-    test "if user is unauthenticated", %{conn: conn, local: local, remote: remote} do
+    test "if user is unauthenticated", %{
+      conn: conn,
+      local: local,
+      remote: remote,
+      local_activity_remote_object: local_activity_remote_object
+    } do
       res_conn = get(conn, "/api/v1/statuses/#{local.id}")
 
       assert json_response_and_validate_schema(res_conn, :not_found) == %{
@@ -822,18 +960,31 @@ defmodule Pleroma.Web.MastodonAPI.StatusControllerTest do
              }
 
       res_conn = get(conn, "/api/v1/statuses/#{remote.id}")
+
+      assert json_response_and_validate_schema(res_conn, :not_found) == %{
+               "error" => "Record not found"
+             }
+
+      res_conn = get(conn, "/api/v1/statuses/#{local_activity_remote_object.id}")
 
       assert json_response_and_validate_schema(res_conn, :not_found) == %{
                "error" => "Record not found"
              }
     end
 
-    test "if user is authenticated", %{local: local, remote: remote} do
+    test "if user is authenticated", %{
+      local: local,
+      remote: remote,
+      local_activity_remote_object: local_activity_remote_object
+    } do
       %{conn: conn} = oauth_access(["read"])
       res_conn = get(conn, "/api/v1/statuses/#{local.id}")
       assert %{"id" => _} = json_response_and_validate_schema(res_conn, 200)
 
       res_conn = get(conn, "/api/v1/statuses/#{remote.id}")
+      assert %{"id" => _} = json_response_and_validate_schema(res_conn, 200)
+
+      res_conn = get(conn, "/api/v1/statuses/#{local_activity_remote_object.id}")
       assert %{"id" => _} = json_response_and_validate_schema(res_conn, 200)
     end
   end
@@ -843,8 +994,19 @@ defmodule Pleroma.Web.MastodonAPI.StatusControllerTest do
 
     setup do: clear_config([:restrict_unauthenticated, :activities, :local], true)
 
-    test "if user is unauthenticated", %{conn: conn, local: local, remote: remote} do
+    test "if user is unauthenticated", %{
+      conn: conn,
+      local: local,
+      remote: remote,
+      local_activity_remote_object: local_activity_remote_object
+    } do
       res_conn = get(conn, "/api/v1/statuses/#{local.id}")
+
+      assert json_response_and_validate_schema(res_conn, :not_found) == %{
+               "error" => "Record not found"
+             }
+
+      res_conn = get(conn, "/api/v1/statuses/#{local_activity_remote_object.id}")
 
       assert json_response_and_validate_schema(res_conn, :not_found) == %{
                "error" => "Record not found"
@@ -854,12 +1016,19 @@ defmodule Pleroma.Web.MastodonAPI.StatusControllerTest do
       assert %{"id" => _} = json_response_and_validate_schema(res_conn, 200)
     end
 
-    test "if user is authenticated", %{local: local, remote: remote} do
+    test "if user is authenticated", %{
+      local: local,
+      remote: remote,
+      local_activity_remote_object: local_activity_remote_object
+    } do
       %{conn: conn} = oauth_access(["read"])
       res_conn = get(conn, "/api/v1/statuses/#{local.id}")
       assert %{"id" => _} = json_response_and_validate_schema(res_conn, 200)
 
       res_conn = get(conn, "/api/v1/statuses/#{remote.id}")
+      assert %{"id" => _} = json_response_and_validate_schema(res_conn, 200)
+
+      res_conn = get(conn, "/api/v1/statuses/#{local_activity_remote_object.id}")
       assert %{"id" => _} = json_response_and_validate_schema(res_conn, 200)
     end
   end
@@ -869,7 +1038,12 @@ defmodule Pleroma.Web.MastodonAPI.StatusControllerTest do
 
     setup do: clear_config([:restrict_unauthenticated, :activities, :remote], true)
 
-    test "if user is unauthenticated", %{conn: conn, local: local, remote: remote} do
+    test "if user is unauthenticated", %{
+      conn: conn,
+      local: local,
+      remote: remote,
+      local_activity_remote_object: local_activity_remote_object
+    } do
       res_conn = get(conn, "/api/v1/statuses/#{local.id}")
       assert %{"id" => _} = json_response_and_validate_schema(res_conn, 200)
 
@@ -878,15 +1052,163 @@ defmodule Pleroma.Web.MastodonAPI.StatusControllerTest do
       assert json_response_and_validate_schema(res_conn, :not_found) == %{
                "error" => "Record not found"
              }
+
+      res_conn = get(conn, "/api/v1/statuses/#{local_activity_remote_object.id}")
+
+      assert json_response_and_validate_schema(res_conn, :not_found) == %{
+               "error" => "Record not found"
+             }
     end
 
-    test "if user is authenticated", %{local: local, remote: remote} do
+    test "if user is authenticated", %{
+      local: local,
+      remote: remote,
+      local_activity_remote_object: local_activity_remote_object
+    } do
       %{conn: conn} = oauth_access(["read"])
       res_conn = get(conn, "/api/v1/statuses/#{local.id}")
       assert %{"id" => _} = json_response_and_validate_schema(res_conn, 200)
 
       res_conn = get(conn, "/api/v1/statuses/#{remote.id}")
       assert %{"id" => _} = json_response_and_validate_schema(res_conn, 200)
+
+      res_conn = get(conn, "/api/v1/statuses/#{local_activity_remote_object.id}")
+      assert %{"id" => _} = json_response_and_validate_schema(res_conn, 200)
+    end
+  end
+
+  # Note: Activities of type Flag,Follow,Delete,Accept,Reject,Undo return 404
+  describe "status has correct attribution when fetching as" do
+    setup do: local_interactions_to_remote()
+
+    test "Add/Remove activity", %{conn: conn, interacter: user} do
+      add = insert(:add_activity, user: user)
+      add_id = add.id
+      remove = insert(:remove_activity, user: user)
+      remove_id = remove.id
+      user_id = user.id
+
+      # Schema validation fails:
+      # null value where integer expected at /pleroma/conversation_id
+      result1 =
+        conn
+        |> get("/api/v1/statuses/#{add_id}")
+        |> json_response(200)
+
+      assert match?(%{"id" => ^add_id, "account" => %{"id" => ^user_id}}, result1)
+
+      result2 =
+        conn
+        |> get("/api/v1/statuses/#{remove_id}")
+        |> json_response(200)
+
+      assert match?(%{"id" => ^remove_id, "account" => %{"id" => ^user_id}}, result2)
+    end
+
+    test "Announce activity", %{
+      conn: conn,
+      announce: activity,
+      interacter: interacter,
+      interacted: user
+    } do
+      announce_id = activity.id
+      announced_activity = Pleroma.Activity.get_create_by_object_ap_id(activity.data["object"])
+      announced_id = announced_activity.id
+      interacter_ap_id = interacter.id
+      user_id = user.id
+
+      result =
+        conn
+        |> get("/api/v1/statuses/#{activity.id}")
+        |> json_response_and_validate_schema(200)
+
+      assert match?(
+               %{
+                 "id" => ^announce_id,
+                 "account" => %{"id" => ^interacter_ap_id},
+                 "reblog" => %{"account" => %{"id" => ^user_id}, "id" => ^announced_id}
+               },
+               result
+             )
+    end
+
+    test "Create activity", %{conn: conn, interacted: user} do
+      note_activity = insert(:note_activity, local: false, object_local: false, user: user)
+      note_activity_id = note_activity.id
+      user_id = user.id
+
+      result =
+        conn
+        |> get("/api/v1/statuses/#{note_activity_id}")
+        |> json_response_and_validate_schema(200)
+
+      assert match?(%{"id" => ^note_activity_id, "account" => %{"id" => ^user_id}}, result)
+    end
+
+    test "EmojiReact activity", %{conn: conn, emoji_react: activity, interacted: user} do
+      emoji_react_id = activity.id
+      user_id = user.id
+
+      result =
+        conn
+        |> get("/api/v1/statuses/#{emoji_react_id}")
+        |> json_response_and_validate_schema(200)
+
+      assert match?(%{"id" => ^emoji_react_id, "account" => %{"id" => ^user_id}}, result)
+    end
+
+    test "Like activity", %{conn: conn, favorite: activity, interacted: user} do
+      like_id = activity.id
+      user_id = user.id
+
+      result =
+        conn
+        |> get("/api/v1/statuses/#{like_id}")
+        |> json_response_and_validate_schema(200)
+
+      assert match?(%{"id" => ^like_id, "account" => %{"id" => ^user_id}}, result)
+    end
+
+    test "Update activity" do
+      %{conn: conn, user: user} = oauth_access(["write:statuses"])
+      user_id = user.id
+
+      {:ok, activity} = CommonAPI.post(user, %{status: "This will be edited"})
+      {:ok, updated_activity} = CommonAPI.update(activity, user, %{status: "edited"})
+
+      activity_id = activity.id
+      updated_activity_id = updated_activity.id
+
+      result1 =
+        conn
+        |> get("/api/v1/statuses/#{activity_id}")
+        |> json_response_and_validate_schema(200)
+
+      # Even though we ask for the original Create activity, updated post is served
+      assert match?(
+               %{
+                 "id" => ^activity_id,
+                 "account" => %{"id" => ^user_id},
+                 "content" => "edited"
+               },
+               result1
+             )
+
+      # Schema validation fails:
+      # null value where integer expected at /pleroma/conversation_id
+      result2 =
+        conn
+        |> get("/api/v1/statuses/#{updated_activity_id}")
+        |> json_response(200)
+
+      assert match?(
+               %{
+                 "id" => ^updated_activity_id,
+                 "account" => %{"id" => ^user_id},
+                 "content" => "edited"
+               },
+               result2
+             )
     end
   end
 
@@ -946,18 +1268,35 @@ defmodule Pleroma.Web.MastodonAPI.StatusControllerTest do
 
     setup do: clear_config([:restrict_unauthenticated, :activities, :remote], true)
 
-    test "if user is unauthenticated", %{conn: conn, local: local, remote: remote} do
-      res_conn = get(conn, "/api/v1/statuses?id[]=#{local.id}&id[]=#{remote.id}")
+    test "if user is unauthenticated", %{
+      conn: conn,
+      local: local,
+      remote: remote,
+      local_activity_remote_object: local_activity_remote_object
+    } do
+      res_conn =
+        get(
+          conn,
+          "/api/v1/statuses?id[]=#{local.id}&id[]=#{remote.id}&id[]=#{local_activity_remote_object.id}"
+        )
 
       assert json_response_and_validate_schema(res_conn, 200) == []
     end
 
-    test "if user is authenticated", %{local: local, remote: remote} do
+    test "if user is authenticated", %{
+      local: local,
+      remote: remote,
+      local_activity_remote_object: local_activity_remote_object
+    } do
       %{conn: conn} = oauth_access(["read"])
 
-      res_conn = get(conn, "/api/v1/statuses?id[]=#{local.id}&id[]=#{remote.id}")
+      res_conn =
+        get(
+          conn,
+          "/api/v1/statuses?id[]=#{local.id}&id[]=#{remote.id}&id[]=#{local_activity_remote_object.id}"
+        )
 
-      assert length(json_response_and_validate_schema(res_conn, 200)) == 2
+      assert length(json_response_and_validate_schema(res_conn, 200)) == 3
     end
   end
 
@@ -966,19 +1305,36 @@ defmodule Pleroma.Web.MastodonAPI.StatusControllerTest do
 
     setup do: clear_config([:restrict_unauthenticated, :activities, :local], true)
 
-    test "if user is unauthenticated", %{conn: conn, local: local, remote: remote} do
-      res_conn = get(conn, "/api/v1/statuses?id[]=#{local.id}&id[]=#{remote.id}")
+    test "if user is unauthenticated", %{
+      conn: conn,
+      local: local,
+      remote: remote,
+      local_activity_remote_object: local_activity_remote_object
+    } do
+      res_conn =
+        get(
+          conn,
+          "/api/v1/statuses?id[]=#{local.id}&id[]=#{remote.id}&id[]=#{local_activity_remote_object.id}"
+        )
 
       remote_id = remote.id
       assert [%{"id" => ^remote_id}] = json_response_and_validate_schema(res_conn, 200)
     end
 
-    test "if user is authenticated", %{local: local, remote: remote} do
+    test "if user is authenticated", %{
+      local: local,
+      remote: remote,
+      local_activity_remote_object: local_activity_remote_object
+    } do
       %{conn: conn} = oauth_access(["read"])
 
-      res_conn = get(conn, "/api/v1/statuses?id[]=#{local.id}&id[]=#{remote.id}")
+      res_conn =
+        get(
+          conn,
+          "/api/v1/statuses?id[]=#{local.id}&id[]=#{remote.id}&id[]=#{local_activity_remote_object.id}"
+        )
 
-      assert length(json_response_and_validate_schema(res_conn, 200)) == 2
+      assert length(json_response_and_validate_schema(res_conn, 200)) == 3
     end
   end
 
@@ -987,22 +1343,40 @@ defmodule Pleroma.Web.MastodonAPI.StatusControllerTest do
 
     setup do: clear_config([:restrict_unauthenticated, :activities, :remote], true)
 
-    test "if user is unauthenticated", %{conn: conn, local: local, remote: remote} do
-      res_conn = get(conn, "/api/v1/statuses?id[]=#{local.id}&id[]=#{remote.id}")
+    test "if user is unauthenticated", %{
+      conn: conn,
+      local: local,
+      remote: remote,
+      local_activity_remote_object: local_activity_remote_object
+    } do
+      res_conn =
+        get(
+          conn,
+          "/api/v1/statuses?id[]=#{local.id}&id[]=#{remote.id}&id[]=#{local_activity_remote_object.id}"
+        )
 
       local_id = local.id
       assert [%{"id" => ^local_id}] = json_response_and_validate_schema(res_conn, 200)
     end
 
-    test "if user is authenticated", %{local: local, remote: remote} do
+    test "if user is authenticated", %{
+      local: local,
+      remote: remote,
+      local_activity_remote_object: local_activity_remote_object
+    } do
       %{conn: conn} = oauth_access(["read"])
 
-      res_conn = get(conn, "/api/v1/statuses?id[]=#{local.id}&id[]=#{remote.id}")
+      res_conn =
+        get(
+          conn,
+          "/api/v1/statuses?id[]=#{local.id}&id[]=#{remote.id}&id[]=#{local_activity_remote_object.id}"
+        )
 
-      assert length(json_response_and_validate_schema(res_conn, 200)) == 2
+      assert length(json_response_and_validate_schema(res_conn, 200)) == 3
     end
   end
 
+  # Note: Context route on EmojiReact/Announce activities puts everything into the ancestors field
   describe "getting status contexts restricted unauthenticated for local and remote" do
     setup do: local_and_remote_context_activities()
 
@@ -1021,6 +1395,40 @@ defmodule Pleroma.Web.MastodonAPI.StatusControllerTest do
 
     test "if user is unauthenticated reply", %{conn: conn, locals: [_, reply_id]} do
       res_conn = get(conn, "/api/v1/statuses/#{reply_id}/context")
+
+      assert json_response_and_validate_schema(res_conn, 200) == %{
+               "ancestors" => [],
+               "descendants" => []
+             }
+    end
+
+    test "if user is unauthenticated Activity interactions", %{
+      conn: conn,
+      local_interactions: [local_to_local, local_to_remote],
+      remote_interactions: [remote_to_local, remote_to_remote]
+    } do
+      res_conn = get(conn, "/api/v1/statuses/#{local_to_local}/context")
+
+      assert json_response_and_validate_schema(res_conn, 200) == %{
+               "ancestors" => [],
+               "descendants" => []
+             }
+
+      res_conn = get(conn, "/api/v1/statuses/#{local_to_remote}/context")
+
+      assert json_response_and_validate_schema(res_conn, 200) == %{
+               "ancestors" => [],
+               "descendants" => []
+             }
+
+      res_conn = get(conn, "/api/v1/statuses/#{remote_to_local}/context")
+
+      assert json_response_and_validate_schema(res_conn, 200) == %{
+               "ancestors" => [],
+               "descendants" => []
+             }
+
+      res_conn = get(conn, "/api/v1/statuses/#{remote_to_remote}/context")
 
       assert json_response_and_validate_schema(res_conn, 200) == %{
                "ancestors" => [],
@@ -1060,6 +1468,47 @@ defmodule Pleroma.Web.MastodonAPI.StatusControllerTest do
 
       assert post_id in ancestor_ids
       assert remote_reply_id in descendant_ids
+    end
+
+    test "if user is authenticated Activity interactions", %{
+      locals: [post_id, reply_id],
+      remote: remote_reply_id,
+      local_interactions: [local_to_local, local_to_remote],
+      remote_interactions: [remote_to_local, remote_to_remote]
+    } do
+      %{conn: conn} = oauth_access(["read"])
+      all_ids = [post_id, reply_id, remote_reply_id]
+      res_conn = get(conn, "/api/v1/statuses/#{local_to_local}/context")
+
+      %{"ancestors" => ancestors1, "descendants" => []} =
+        json_response_and_validate_schema(res_conn, 200)
+
+      ancestor_ids1 = extract_activity_ids_from_response(ancestors1)
+      assert all_ids_included?(ancestor_ids1, all_ids)
+
+      res_conn = get(conn, "/api/v1/statuses/#{local_to_remote}/context")
+
+      %{"ancestors" => ancestors2, "descendants" => []} =
+        json_response_and_validate_schema(res_conn, 200)
+
+      ancestor_ids2 = extract_activity_ids_from_response(ancestors2)
+      assert all_ids_included?(ancestor_ids2, all_ids)
+
+      res_conn = get(conn, "/api/v1/statuses/#{remote_to_local}/context")
+
+      %{"ancestors" => ancestors3, "descendants" => []} =
+        json_response_and_validate_schema(res_conn, 200)
+
+      ancestor_ids3 = extract_activity_ids_from_response(ancestors3)
+      assert all_ids_included?(ancestor_ids3, all_ids)
+
+      res_conn = get(conn, "/api/v1/statuses/#{remote_to_remote}/context")
+
+      %{"ancestors" => ancestors4, "descendants" => []} =
+        json_response_and_validate_schema(res_conn, 200)
+
+      ancestor_ids4 = extract_activity_ids_from_response(ancestors4)
+      assert all_ids_included?(ancestor_ids4, all_ids)
     end
   end
 
@@ -1110,6 +1559,45 @@ defmodule Pleroma.Web.MastodonAPI.StatusControllerTest do
       assert remote_reply_id in descendant_ids
     end
 
+    test "if user is unauthenticated Activity interactions", %{
+      conn: conn,
+      remote: remote_reply_id,
+      local_interactions: [local_to_local, local_to_remote],
+      remote_interactions: [remote_to_local, remote_to_remote]
+    } do
+      res_conn = get(conn, "/api/v1/statuses/#{local_to_local}/context")
+
+      %{"ancestors" => ancestors1, "descendants" => []} =
+        json_response_and_validate_schema(res_conn, 200)
+
+      ancestor_ids1 = extract_activity_ids_from_response(ancestors1)
+      assert all_ids_included?(ancestor_ids1, [remote_reply_id])
+
+      res_conn = get(conn, "/api/v1/statuses/#{local_to_remote}/context")
+
+      %{"ancestors" => ancestors2, "descendants" => []} =
+        json_response_and_validate_schema(res_conn, 200)
+
+      ancestor_ids2 = extract_activity_ids_from_response(ancestors2)
+      assert all_ids_included?(ancestor_ids2, [remote_reply_id])
+
+      res_conn = get(conn, "/api/v1/statuses/#{remote_to_local}/context")
+
+      %{"ancestors" => ancestors3, "descendants" => []} =
+        json_response_and_validate_schema(res_conn, 200)
+
+      ancestor_ids3 = extract_activity_ids_from_response(ancestors3)
+      assert all_ids_included?(ancestor_ids3, [remote_reply_id])
+
+      res_conn = get(conn, "/api/v1/statuses/#{remote_to_remote}/context")
+
+      %{"ancestors" => ancestors4, "descendants" => []} =
+        json_response_and_validate_schema(res_conn, 200)
+
+      ancestor_ids4 = extract_activity_ids_from_response(ancestors4)
+      assert all_ids_included?(ancestor_ids4, [remote_reply_id])
+    end
+
     test "if user is authenticated", %{locals: [post_id, reply_id], remote: remote_reply_id} do
       %{conn: conn} = oauth_access(["read"])
       res_conn = get(conn, "/api/v1/statuses/#{post_id}/context")
@@ -1142,6 +1630,47 @@ defmodule Pleroma.Web.MastodonAPI.StatusControllerTest do
 
       assert post_id in ancestor_ids
       assert remote_reply_id in descendant_ids
+    end
+
+    test "if user is authenticated Activity interactions", %{
+      locals: [post_id, reply_id],
+      remote: remote_reply_id,
+      local_interactions: [local_to_local, local_to_remote],
+      remote_interactions: [remote_to_local, remote_to_remote]
+    } do
+      %{conn: conn} = oauth_access(["read"])
+      all_ids = [post_id, reply_id, remote_reply_id]
+      res_conn = get(conn, "/api/v1/statuses/#{local_to_local}/context")
+
+      %{"ancestors" => ancestors1, "descendants" => []} =
+        json_response_and_validate_schema(res_conn, 200)
+
+      ancestor_ids1 = extract_activity_ids_from_response(ancestors1)
+      assert all_ids_included?(ancestor_ids1, all_ids)
+
+      res_conn = get(conn, "/api/v1/statuses/#{local_to_remote}/context")
+
+      %{"ancestors" => ancestors2, "descendants" => []} =
+        json_response_and_validate_schema(res_conn, 200)
+
+      ancestor_ids2 = extract_activity_ids_from_response(ancestors2)
+      assert all_ids_included?(ancestor_ids2, all_ids)
+
+      res_conn = get(conn, "/api/v1/statuses/#{remote_to_local}/context")
+
+      %{"ancestors" => ancestors3, "descendants" => []} =
+        json_response_and_validate_schema(res_conn, 200)
+
+      ancestor_ids3 = extract_activity_ids_from_response(ancestors3)
+      assert all_ids_included?(ancestor_ids3, all_ids)
+
+      res_conn = get(conn, "/api/v1/statuses/#{remote_to_remote}/context")
+
+      %{"ancestors" => ancestors4, "descendants" => []} =
+        json_response_and_validate_schema(res_conn, 200)
+
+      ancestor_ids4 = extract_activity_ids_from_response(ancestors4)
+      assert all_ids_included?(ancestor_ids4, all_ids)
     end
   end
 
@@ -1192,6 +1721,46 @@ defmodule Pleroma.Web.MastodonAPI.StatusControllerTest do
       assert remote_reply_id not in descendant_ids
     end
 
+    test "if user is unauthenticated Activity interactions", %{
+      conn: conn,
+      locals: [post_id, reply_id],
+      local_interactions: [local_to_local, local_to_remote],
+      remote_interactions: [remote_to_local, remote_to_remote]
+    } do
+      res_conn = get(conn, "/api/v1/statuses/#{local_to_local}/context")
+      all_ids = [post_id, reply_id]
+
+      %{"ancestors" => ancestors1, "descendants" => []} =
+        json_response_and_validate_schema(res_conn, 200)
+
+      ancestor_ids1 = extract_activity_ids_from_response(ancestors1)
+      assert all_ids_included?(ancestor_ids1, all_ids)
+
+      res_conn = get(conn, "/api/v1/statuses/#{local_to_remote}/context")
+
+      %{"ancestors" => ancestors2, "descendants" => []} =
+        json_response_and_validate_schema(res_conn, 200)
+
+      ancestor_ids2 = extract_activity_ids_from_response(ancestors2)
+      assert all_ids_included?(ancestor_ids2, all_ids)
+
+      res_conn = get(conn, "/api/v1/statuses/#{remote_to_local}/context")
+
+      %{"ancestors" => ancestors3, "descendants" => []} =
+        json_response_and_validate_schema(res_conn, 200)
+
+      ancestor_ids3 = extract_activity_ids_from_response(ancestors3)
+      assert all_ids_included?(ancestor_ids3, all_ids)
+
+      res_conn = get(conn, "/api/v1/statuses/#{remote_to_remote}/context")
+
+      %{"ancestors" => ancestors4, "descendants" => []} =
+        json_response_and_validate_schema(res_conn, 200)
+
+      ancestor_ids4 = extract_activity_ids_from_response(ancestors4)
+      assert all_ids_included?(ancestor_ids4, all_ids)
+    end
+
     test "if user is authenticated", %{locals: [post_id, reply_id], remote: remote_reply_id} do
       %{conn: conn} = oauth_access(["read"])
       res_conn = get(conn, "/api/v1/statuses/#{post_id}/context")
@@ -1224,6 +1793,47 @@ defmodule Pleroma.Web.MastodonAPI.StatusControllerTest do
 
       assert post_id in ancestor_ids
       assert remote_reply_id in descendant_ids
+    end
+
+    test "if user is authenticated Activity interactions", %{
+      locals: [post_id, reply_id],
+      remote: remote_reply_id,
+      local_interactions: [local_to_local, local_to_remote],
+      remote_interactions: [remote_to_local, remote_to_remote]
+    } do
+      %{conn: conn} = oauth_access(["read"])
+      all_ids = [post_id, reply_id, remote_reply_id]
+      res_conn = get(conn, "/api/v1/statuses/#{local_to_local}/context")
+
+      %{"ancestors" => ancestors1, "descendants" => []} =
+        json_response_and_validate_schema(res_conn, 200)
+
+      ancestor_ids1 = extract_activity_ids_from_response(ancestors1)
+      assert all_ids_included?(ancestor_ids1, all_ids)
+
+      res_conn = get(conn, "/api/v1/statuses/#{local_to_remote}/context")
+
+      %{"ancestors" => ancestors2, "descendants" => []} =
+        json_response_and_validate_schema(res_conn, 200)
+
+      ancestor_ids2 = extract_activity_ids_from_response(ancestors2)
+      assert all_ids_included?(ancestor_ids2, all_ids)
+
+      res_conn = get(conn, "/api/v1/statuses/#{remote_to_local}/context")
+
+      %{"ancestors" => ancestors3, "descendants" => []} =
+        json_response_and_validate_schema(res_conn, 200)
+
+      ancestor_ids3 = extract_activity_ids_from_response(ancestors3)
+      assert all_ids_included?(ancestor_ids3, all_ids)
+
+      res_conn = get(conn, "/api/v1/statuses/#{remote_to_remote}/context")
+
+      %{"ancestors" => ancestors4, "descendants" => []} =
+        json_response_and_validate_schema(res_conn, 200)
+
+      ancestor_ids4 = extract_activity_ids_from_response(ancestors4)
+      assert all_ids_included?(ancestor_ids4, all_ids)
     end
   end
 
@@ -1416,6 +2026,24 @@ defmodule Pleroma.Web.MastodonAPI.StatusControllerTest do
 
       assert to_string(activity.id) == id
     end
+
+    test "cannot reblog private status of others (even if visible)", %{conn: conn, user: user} do
+      followed = insert(:user, local: true)
+
+      {:ok, _, _, %{data: %{"state" => "accept"}}} = CommonAPI.follow(followed, user)
+
+      {:ok, activity} = CommonAPI.post(followed, %{status: "cofe", visibility: "private"})
+
+      assert Visibility.visible_for_user?(activity, user)
+
+      resp =
+        conn
+        |> put_req_header("content-type", "application/json")
+        |> post("/api/v1/statuses/#{activity.id}/reblog")
+        |> json_response_and_validate_schema(404)
+
+      assert match?(%{"error" => _}, resp)
+    end
   end
 
   describe "unreblogging" do
@@ -1444,6 +2072,34 @@ defmodule Pleroma.Web.MastodonAPI.StatusControllerTest do
         |> post("/api/v1/statuses/foo/unreblog")
 
       assert json_response_and_validate_schema(conn, 404) == %{"error" => "Record not found"}
+    end
+
+    test "can't unreblog someone else's reblog", %{user: user, conn: conn} do
+      activity = insert(:note_activity)
+      other_user = insert(:user)
+
+      {:ok, %{id: reblog_id}} = CommonAPI.repeat(activity.id, other_user)
+
+      # unreblog by base post
+      resp1 =
+        conn
+        |> put_req_header("content-type", "application/json")
+        |> post("/api/v1/statuses/#{activity.id}/unreblog")
+        |> json_response(400)
+
+      assert match?(%{"error" => _}, resp1)
+
+      # unreblog by reblog ID (reblog IDs are accepted by some APIs;
+      # ensure it fails here one way or another)
+      resp2 =
+        build_conn()
+        |> assign(:user, user)
+        |> assign(:token, insert(:oauth_token, user: user, scopes: ["write", "read"]))
+        |> put_req_header("content-type", "application/json")
+        |> post("/api/v1/statuses/#{reblog_id}/unreblog")
+        |> json_response_and_validate_schema(404)
+
+      assert match?(%{"error" => _}, resp2)
     end
   end
 
@@ -1477,13 +2133,23 @@ defmodule Pleroma.Web.MastodonAPI.StatusControllerTest do
              |> json_response_and_validate_schema(200)
     end
 
-    test "returns 404 error for a wrong id", %{conn: conn} do
-      conn =
-        conn
-        |> put_req_header("content-type", "application/json")
-        |> post("/api/v1/statuses/1/favourite")
+    test "a status you cannot see fails", %{conn: conn} do
+      stranger = insert(:user)
 
-      assert json_response_and_validate_schema(conn, 404) == %{"error" => "Record not found"}
+      {:ok, activity} =
+        CommonAPI.post(stranger, %{status: "it can eternal lie", visibility: "private"})
+
+      assert conn
+             |> put_req_header("content-type", "application/json")
+             |> post("/api/v1/statuses/#{activity.id}/favourite")
+             |> json_response_and_validate_schema(404) == %{"error" => "Record not found"}
+    end
+
+    test "returns 404 error for a wrong id", %{conn: conn} do
+      assert conn
+             |> put_req_header("content-type", "application/json")
+             |> post("/api/v1/statuses/1/favourite")
+             |> json_response_and_validate_schema(404) == %{"error" => "Record not found"}
     end
   end
 
@@ -1506,6 +2172,54 @@ defmodule Pleroma.Web.MastodonAPI.StatusControllerTest do
       assert to_string(activity.id) == id
     end
 
+    test "can't unfavourite post that isn't visible to user" do
+      user = insert(:user)
+      %{conn: conn, user: stranger} = oauth_access(["write:favourites"])
+      {:ok, activity} = CommonAPI.post(user, %{status: "invisible", visibility: "private"})
+
+      refute Pleroma.Web.ActivityPub.Visibility.visible_for_user?(activity, stranger)
+
+      assert conn
+             |> put_req_header("content-type", "application/json")
+             |> post("/api/v1/statuses/#{activity.id}/unfavourite")
+             |> json_response_and_validate_schema(404) == %{"error" => "Record not found"}
+    end
+
+    test "can't unfavourite post that isn't favourited", %{conn: conn} do
+      activity = insert(:note_activity)
+
+      # using base post ID
+      assert conn
+             |> put_req_header("content-type", "application/json")
+             |> post("/api/v1/statuses/#{activity.id}/unfavourite")
+             |> json_response_and_validate_schema(400) == %{"error" => "Could not unfavorite"}
+    end
+
+    test "can't unfavourite other user's favs", %{conn: conn} do
+      activity = insert(:note_activity)
+
+      other = insert(:user)
+      {:ok, _} = CommonAPI.favorite(activity.id, other)
+
+      # using base post ID
+      assert conn
+             |> put_req_header("content-type", "application/json")
+             |> post("/api/v1/statuses/#{activity.id}/unfavourite")
+             |> json_response_and_validate_schema(400) == %{"error" => "Could not unfavorite"}
+    end
+
+    test "can't unfavourite other user's favs using their activity", %{conn: conn} do
+      activity = insert(:note_activity)
+
+      other = insert(:user)
+      {:ok, fav_activity} = CommonAPI.favorite(activity.id, other)
+      # some APIs (used to) take IDs of any activity type, make sure this fails one way or another
+      assert conn
+             |> put_req_header("content-type", "application/json")
+             |> post("/api/v1/statuses/#{fav_activity.id}/unfavourite")
+             |> json_response_and_validate_schema(404) == %{"error" => "Record not found"}
+    end
+
     test "returns 404 error for a wrong id", %{conn: conn} do
       conn =
         conn
@@ -1514,6 +2228,19 @@ defmodule Pleroma.Web.MastodonAPI.StatusControllerTest do
 
       assert json_response_and_validate_schema(conn, 404) == %{"error" => "Record not found"}
     end
+  end
+
+  test "can't favourite post that isn't visible to user" do
+    user = insert(:user)
+    %{conn: conn, user: stranger} = oauth_access(["write:favourites"])
+    {:ok, activity} = CommonAPI.post(user, %{status: "invisible", visibility: "private"})
+
+    refute Pleroma.Web.ActivityPub.Visibility.visible_for_user?(activity, stranger)
+
+    assert conn
+           |> put_req_header("content-type", "application/json")
+           |> post("/api/v1/statuses/#{activity.id}/favourite")
+           |> json_response_and_validate_schema(404) == %{"error" => "Record not found"}
   end
 
   describe "pinned statuses" do
@@ -1549,7 +2276,7 @@ defmodule Pleroma.Web.MastodonAPI.StatusControllerTest do
              |> json_response(403) == %{"error" => "Invalid credentials."}
     end
 
-    test "/pin: returns 400 error when activity is not public", %{conn: conn, user: user} do
+    test "/pin: returns 422 error when activity is not public", %{conn: conn, user: user} do
       {:ok, dm} = CommonAPI.post(user, %{status: "test", visibility: "direct"})
 
       conn =
@@ -1560,6 +2287,18 @@ defmodule Pleroma.Web.MastodonAPI.StatusControllerTest do
       assert json_response_and_validate_schema(conn, 422) == %{
                "error" => "Non-public status cannot be pinned"
              }
+    end
+
+    test "/pin: returns 404 error when activity not visible to user", %{user: user} do
+      %{conn: conn, user: stranger} = oauth_access(["write:accounts"])
+      {:ok, activity} = CommonAPI.post(user, %{status: "invisible", visibility: "private"})
+
+      refute Pleroma.Web.ActivityPub.Visibility.visible_for_user?(activity, stranger)
+
+      assert conn
+             |> put_req_header("content-type", "application/json")
+             |> post("/api/v1/statuses/#{activity.id}/pin")
+             |> json_response_and_validate_schema(404) == %{"error" => "Record not found"}
     end
 
     test "pin by another user", %{activity: activity} do
@@ -1594,6 +2333,32 @@ defmodule Pleroma.Web.MastodonAPI.StatusControllerTest do
              |> put_req_header("content-type", "application/json")
              |> post("/api/v1/statuses/1/unpin")
              |> json_response_and_validate_schema(404) == %{"error" => "Record not found"}
+    end
+
+    test "/unpin: returns 404 error when activity not visible to user", %{user: user} do
+      %{conn: conn, user: stranger} = oauth_access(["write:accounts"])
+      {:ok, activity} = CommonAPI.post(user, %{status: "yumi", visibility: "private"})
+
+      refute Pleroma.Web.ActivityPub.Visibility.visible_for_user?(activity, stranger)
+
+      assert conn
+             |> assign(:user, stranger)
+             |> put_req_header("content-type", "application/json")
+             |> post("/api/v1/statuses/#{activity.id}/unpin")
+             |> json_response_and_validate_schema(404) == %{"error" => "Record not found"}
+    end
+
+    test "/unpin: returns 422 error when activity not owned by user", %{activity: activity} do
+      %{conn: conn, user: user} = oauth_access(["write:accounts"])
+
+      assert Pleroma.Web.ActivityPub.Visibility.visible_for_user?(activity, user)
+
+      assert conn
+             |> put_req_header("content-type", "application/json")
+             |> post("/api/v1/statuses/#{activity.id}/unpin")
+             |> json_response_and_validate_schema(422) == %{
+               "error" => "Someone else's status cannot be unpinned"
+             }
     end
 
     test "max pinned statuses", %{conn: conn, user: user, activity: activity_one} do
@@ -1707,6 +2472,28 @@ defmodule Pleroma.Web.MastodonAPI.StatusControllerTest do
              json_response_and_validate_schema(bookmarks, 200)
   end
 
+  test "cannot bookmark invisible post" do
+    user = insert(:user)
+    %{conn: conn, user: stranger} = oauth_access(["write:bookmarks"])
+    {:ok, activity} = CommonAPI.post(user, %{status: "mocha", visibility: "private"})
+
+    refute Pleroma.Web.ActivityPub.Visibility.visible_for_user?(activity, stranger)
+
+    resp1 =
+      conn
+      |> put_req_header("content-type", "application/json")
+      |> post("/api/v1/statuses/#{activity.id}/bookmark")
+
+    assert json_response_and_validate_schema(resp1, 404) == %{"error" => "Record not found"}
+
+    resp2 =
+      conn
+      |> put_req_header("content-type", "application/json")
+      |> post("/api/v1/statuses/#{activity.id}/unbookmark")
+
+    assert json_response_and_validate_schema(resp2, 404) == %{"error" => "Record not found"}
+  end
+
   test "bookmark folders" do
     %{conn: conn, user: user} = oauth_access(["write:bookmarks", "read:bookmarks"])
 
@@ -1804,6 +2591,30 @@ defmodule Pleroma.Web.MastodonAPI.StatusControllerTest do
                |> post("/api/v1/statuses/#{activity.id}/unmute")
                |> json_response_and_validate_schema(200)
     end
+
+    test "cannot mute not visible conversation", %{user: user} do
+      {:ok, activity} = CommonAPI.post(user, %{status: "Invisible!", visibility: "private"})
+      %{conn: conn} = oauth_access(["write:mutes"])
+
+      assert conn
+             |> put_req_header("content-type", "application/json")
+             |> post("/api/v1/statuses/#{activity.id}/mute")
+             |> json_response_and_validate_schema(404) == %{
+               "error" => "Record not found"
+             }
+    end
+
+    test "cannot unmute not visible conversation", %{user: user} do
+      {:ok, activity} = CommonAPI.post(user, %{status: "Invisible!", visibility: "private"})
+      %{conn: conn} = oauth_access(["write:mutes"])
+
+      assert conn
+             |> put_req_header("content-type", "application/json")
+             |> post("/api/v1/statuses/#{activity.id}/unmute")
+             |> json_response_and_validate_schema(404) == %{
+               "error" => "Record not found"
+             }
+    end
   end
 
   test "Repeated posts that are replies incorrectly have in_reply_to_id null", %{conn: conn} do
@@ -1867,18 +2678,29 @@ defmodule Pleroma.Web.MastodonAPI.StatusControllerTest do
       %{activity: activity}
     end
 
-    test "returns users who have favorited the status", %{conn: conn, activity: activity} do
-      other_user = insert(:user)
-      {:ok, _} = CommonAPI.favorite(activity.id, other_user)
+    test "returns users who have favorited the status ordered from newest to oldest", %{
+      conn: conn,
+      activity: activity
+    } do
+      [other_user_1, other_user_2] = insert_pair(:user)
+      [other_user_3, other_user_4] = insert_pair(:user)
+
+      {:ok, _} = CommonAPI.favorite(activity.id, other_user_1)
+      {:ok, _} = CommonAPI.favorite(activity.id, other_user_3)
+      {:ok, _} = CommonAPI.favorite(activity.id, other_user_2)
+      {:ok, _} = CommonAPI.favorite(activity.id, other_user_4)
 
       response =
         conn
         |> get("/api/v1/statuses/#{activity.id}/favourited_by")
         |> json_response_and_validate_schema(:ok)
 
-      [%{"id" => id}] = response
+      [%{"id" => id1}, %{"id" => id2}, %{"id" => id3}, %{"id" => id4}] = response
 
-      assert id == other_user.id
+      assert id1 == other_user_4.id
+      assert id2 == other_user_2.id
+      assert id3 == other_user_3.id
+      assert id4 == other_user_1.id
     end
 
     test "returns empty array when status has not been favorited yet", %{
@@ -1957,6 +2779,22 @@ defmodule Pleroma.Web.MastodonAPI.StatusControllerTest do
 
       [%{"id" => id}] = response
       assert id == other_user.id
+    end
+
+    test "fails when base post not visible to current user", %{user: user} do
+      other_user = insert(:user, local: true)
+      %{conn: conn} = oauth_access(["read:accounts"])
+
+      {:ok, activity} =
+        CommonAPI.post(user, %{
+          status: "craving tea and mochi rn",
+          visibility: "private"
+        })
+
+      assert conn
+             |> assign(:user, other_user)
+             |> get("/api/v1/statuses/#{activity.id}/favourited_by")
+             |> json_response_and_validate_schema(404) == %{"error" => "Record not found"}
     end
 
     test "returns empty array when :show_reactions is disabled", %{conn: conn, activity: activity} do
@@ -2077,6 +2915,25 @@ defmodule Pleroma.Web.MastodonAPI.StatusControllerTest do
 
       assert [] == response
     end
+
+    test "does fail when requesting for a non-visible status", %{user: user} do
+      other_user = insert(:user, local: true)
+
+      {:ok, activity} =
+        CommonAPI.post(user, %{
+          status: "deep below it sleeps and mustn't wake",
+          visibility: "private"
+        })
+
+      response =
+        build_conn()
+        |> assign(:user, other_user)
+        |> assign(:token, insert(:oauth_token, user: other_user, scopes: ["read"]))
+        |> get("/api/v1/statuses/#{activity.id}/reblogged_by")
+        |> json_response_and_validate_schema(404)
+
+      assert match?(%{"error" => _}, response)
+    end
   end
 
   test "context" do
@@ -2097,6 +2954,34 @@ defmodule Pleroma.Web.MastodonAPI.StatusControllerTest do
              "ancestors" => [%{"id" => ^id1}, %{"id" => ^id2}],
              "descendants" => [%{"id" => ^id4}, %{"id" => ^id5}]
            } = response
+  end
+
+  test "context doesn't leak priv posts" do
+    %{user: user, conn: conn} = oauth_access(["read:statuses"])
+    stranger = insert(:user)
+
+    {:ok, %{id: id1}} = CommonAPI.post(stranger, %{status: "1", visibility: "public"})
+
+    {:ok, %{id: id2}} =
+      CommonAPI.post(stranger, %{status: "2", visibility: "unlisted", in_reply_to_status_id: id1})
+
+    {:ok, %{id: _id_boo} = act_boo} =
+      CommonAPI.post(stranger, %{status: "boo", visibility: "private", in_reply_to_status_id: id1})
+
+    refute Visibility.visible_for_user?(act_boo, user)
+
+    response =
+      conn
+      |> get("/api/v1/statuses/#{id1}/context")
+      |> json_response_and_validate_schema(:ok)
+
+    assert match?(
+             %{
+               "ancestors" => [],
+               "descendants" => [%{"id" => ^id2}]
+             },
+             response
+           )
   end
 
   test "favorites paginate correctly" do
@@ -2481,6 +3366,107 @@ defmodule Pleroma.Web.MastodonAPI.StatusControllerTest do
         "spoiler_text" => "lol"
       })
       |> json_response_and_validate_schema(:not_found)
+    end
+  end
+
+  describe "translating statuses" do
+    setup do: clear_config([Pleroma.Language.Translation, :provider], TranslationMock)
+
+    test "it translates a status to user language" do
+      user = insert(:user, language: "fr")
+      %{conn: conn} = oauth_access(["read:statuses"], user: user)
+      another_user = insert(:user)
+
+      {:ok, activity} =
+        CommonAPI.post(another_user, %{
+          status: "Cześć!",
+          visibility: "public",
+          language: "pl"
+        })
+
+      response =
+        conn
+        |> post("/api/v1/statuses/#{activity.id}/translate")
+        |> json_response_and_validate_schema(200)
+
+      assert response == %{
+               "content" => "!ćśezC",
+               "detected_source_language" => "pl",
+               "provider" => "TranslationMock"
+             }
+    end
+
+    test "it returns an error if no target language provided" do
+      %{conn: conn} = oauth_access(["read:statuses"])
+      another_user = insert(:user)
+
+      {:ok, activity} =
+        CommonAPI.post(another_user, %{
+          status: "Cześć!",
+          language: "pl"
+        })
+
+      assert conn
+             |> post("/api/v1/statuses/#{activity.id}/translate")
+             |> json_response_and_validate_schema(400)
+    end
+
+    test "it doesn't translate non-public statuses" do
+      %{conn: conn, user: user} = oauth_access(["read:statuses"])
+
+      {:ok, activity} =
+        CommonAPI.post(user, %{
+          status: "Cześć!",
+          visibility: "private",
+          language: "pl"
+        })
+
+      assert conn
+             |> post("/api/v1/statuses/#{activity.id}/translate")
+             |> json_response_and_validate_schema(404)
+    end
+  end
+
+  describe "getting quotes of a specified post" do
+    setup do
+      [current_user, user] = insert_pair(:user)
+      %{user: current_user, conn: conn} = oauth_access(["read:statuses"], user: current_user)
+      [current_user: current_user, user: user, conn: conn]
+    end
+
+    test "shows quotes of a post", %{conn: conn} do
+      user = insert(:user)
+      activity = insert(:note_activity)
+
+      {:ok, quote_post} = CommonAPI.post(user, %{status: "quoat", quote_id: activity.id})
+
+      response =
+        conn
+        |> get("/api/v1/statuses/#{activity.id}/quotes")
+        |> json_response_and_validate_schema(:ok)
+
+      [status] = response
+
+      assert length(response) == 1
+      assert status["id"] == quote_post.id
+    end
+
+    test "returns 404 error when a post can't be seen", %{conn: conn} do
+      activity = insert(:direct_note_activity)
+
+      response =
+        conn
+        |> get("/api/v1/statuses/#{activity.id}/quotes")
+
+      assert json_response_and_validate_schema(response, 404) == %{"error" => "Record not found"}
+    end
+
+    test "returns 404 error when a post does not exist", %{conn: conn} do
+      response =
+        conn
+        |> get("/api/v1/statuses/idontexist/quotes")
+
+      assert json_response_and_validate_schema(response, 404) == %{"error" => "Record not found"}
     end
   end
 end

@@ -87,7 +87,7 @@ defmodule Pleroma.Web.ActivityPub.MRF.StealEmojiPolicy do
           Path.join(Config.get([:instance, :static_dir]), "emoji/stolen")
         )
 
-      File.mkdir_p(emoji_dir_path)
+      Pleroma.Backports.mkdir_p(emoji_dir_path)
 
       new_emojis =
         foreign_emojis

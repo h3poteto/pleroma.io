@@ -61,6 +61,13 @@ defmodule Pleroma.Web.RichMedia.ParserTest do
               }}
   end
 
+  test "truncates title and description fields" do
+    {:ok, parsed} = Parser.parse("https://instagram.com/longtext")
+
+    assert String.length(parsed["title"]) == 120
+    assert String.length(parsed["description"]) == 200
+  end
+
   test "parses OEmbed and filters HTML tags" do
     assert Parser.parse("https://example.com/oembed") ==
              {:ok,

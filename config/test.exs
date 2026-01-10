@@ -156,6 +156,7 @@ config :pleroma, Pleroma.User.Backup, config_impl: Pleroma.UnstubbedConfigMock
 config :pleroma, Pleroma.Uploaders.S3, ex_aws_impl: Pleroma.Uploaders.S3.ExAwsMock
 config :pleroma, Pleroma.Uploaders.S3, config_impl: Pleroma.UnstubbedConfigMock
 config :pleroma, Pleroma.Upload, config_impl: Pleroma.UnstubbedConfigMock
+config :pleroma, Pleroma.Language.LanguageDetector, config_impl: Pleroma.StaticStubbedConfigMock
 config :pleroma, Pleroma.ScheduledActivity, config_impl: Pleroma.UnstubbedConfigMock
 config :pleroma, Pleroma.Web.RichMedia.Helpers, config_impl: Pleroma.StaticStubbedConfigMock
 config :pleroma, Pleroma.Uploaders.IPFS, config_impl: Pleroma.UnstubbedConfigMock
@@ -169,6 +170,10 @@ config :pleroma, Pleroma.Upload.Filter.Mogrify, config_impl: Pleroma.StaticStubb
 config :pleroma, Pleroma.Upload.Filter.Mogrify, mogrify_impl: Pleroma.MogrifyMock
 
 config :pleroma, Pleroma.Signature, http_signatures_impl: Pleroma.StubbedHTTPSignaturesMock
+config :pleroma, Pleroma.Web.ActivityPub.Publisher, signature_impl: Pleroma.SignatureMock
+
+config :pleroma, Pleroma.Web.ActivityPub.Publisher,
+  transmogrifier_impl: Pleroma.Web.ActivityPub.TransmogrifierMock
 
 peer_module =
   if String.to_integer(System.otp_release()) >= 25 do

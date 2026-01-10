@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 
 defmodule Pleroma.Workers.RemoteFetcherWorker do
+  alias Pleroma.Instances
   alias Pleroma.Object.Fetcher
 
   use Oban.Worker, queue: :background, unique: [period: :infinity]
@@ -11,6 +12,11 @@ defmodule Pleroma.Workers.RemoteFetcherWorker do
   def perform(%Job{args: %{"op" => "fetch_remote", "id" => id} = args}) do
     case Fetcher.fetch_object_from_id(id, depth: args["depth"]) do
       {:ok, _object} ->
+        unless Instances.reachable?(id) do
+          # Mark the server as reachable since we successfully fetched an object
+          Instances.set_reachable(id)
+        end
+
         :ok
 
       {:allowed_depth, false} ->

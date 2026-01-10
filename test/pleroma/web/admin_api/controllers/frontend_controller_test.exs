@@ -13,7 +13,7 @@ defmodule Pleroma.Web.AdminAPI.FrontendControllerTest do
 
   setup do
     clear_config([:instance, :static_dir], @dir)
-    File.mkdir_p!(Pleroma.Frontend.dir())
+    Pleroma.Backports.mkdir_p!(Pleroma.Frontend.dir())
 
     on_exit(fn ->
       File.rm_rf(@dir)

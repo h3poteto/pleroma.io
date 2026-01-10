@@ -4,7 +4,8 @@
 
 defmodule Pleroma.Web.Plugs.RemoteIpTest do
   use ExUnit.Case
-  use Plug.Test
+  import Plug.Conn
+  import Plug.Test
 
   alias Pleroma.Web.Plugs.RemoteIp
 

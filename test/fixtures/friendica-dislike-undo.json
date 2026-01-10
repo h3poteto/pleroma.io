@@ -1,0 +1,76 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://w3id.org/security/v1",
+    {
+      "Hashtag": "as:Hashtag",
+      "PropertyValue": "schema:PropertyValue",
+      "conversation": "ostatus:conversation",
+      "dfrn": "http://purl.org/macgirvin/dfrn/1.0/",
+      "diaspora": "https://diasporafoundation.org/ns/",
+      "directMessage": "litepub:directMessage",
+      "discoverable": "toot:discoverable",
+      "featured": {
+        "@id": "toot:featured",
+        "@type": "@id"
+      },
+      "litepub": "http://litepub.social/ns#",
+      "manuallyApprovesFollowers": "as:manuallyApprovesFollowers",
+      "ostatus": "http://ostatus.org#",
+      "quoteUrl": "as:quoteUrl",
+      "schema": "http://schema.org#",
+      "sensitive": "as:sensitive",
+      "toot": "http://joinmastodon.org/ns#",
+      "value": "schema:value",
+      "vcard": "http://www.w3.org/2006/vcard/ns#"
+    }
+  ],
+  "actor": "https://my-place.social/profile/vaartis",
+  "cc": [
+    "https://my-place.social/followers/vaartis"
+  ],
+  "id": "https://my-place.social/objects/e599373b-1368-4b20-cd24-837166957182/Undo",
+  "instrument": {
+    "id": "https://my-place.social/friendica",
+    "name": "Friendica 'Interrupted Fern' 2024.12-1576",
+      "type": "Application",
+      "url": "https://my-place.social"
+  },
+    "object": {
+        "actor": "https://my-place.social/profile/vaartis",
+        "cc": [
+            "https://my-place.social/followers/vaartis"
+        ],
+        "diaspora:guid": "e599373b-1968-4b20-cd24-80d340160302",
+        "diaspora:like": "{\"author\":\"vaartis@my-place.social\",\"guid\":\"e599373b-1968-4b20-cd24-80d340160302\",\"parent_guid\":\"cd36feba-c31f3ed3fd5c064a-17c31593\",\"parent_type\":\"Post\",\"positive\":\"false\",\"author_signature\":\"xR2zLJNfc9Nhx1n8LLMWM1kde12my4cqamIsrH\\/UntKzuDwO4DuHBL0fkFhgC\\/dylxm4HqsHD45MQbtwQCVGq6WhC96TrbMuYEK61HIO23dTr3m+qJVtfdH4wyhUNHgiiYPhZpkLDfnR1JiRWmFTlmZC8q8JEkOB5IQsrWia2eOR6IsqDcdKO\\/Urgns9\\/BdQi8KnchBKSEFc1iUtcOEruvhunKGyW5zI\\/Rltfdz3xGH8tlw+YlMXeWXPnqgOJ9GzNA0lwG4U421L6yylYagW7oxIznnBLB4bO46vYZbgXZV1hiI9ZyveHOinLMY1QkmTj5CNvnx3\\/VJwLovd0v+0Nr2vu\\/3ftbpBXc6L1bsNjlRqtsfwJlcgl+tH1DC4W8tKf+Y3tdtzVw0CHXCuacxHLyq5wZd\\/5YfYR9SJQ\\/jInU4PHA5+hIE3PGqNUp5QfFE0umq56H7MQKsIPgM5mMV4fPAA8OpltuMVDvQYUxalrnvoTf00k90x1wCTK71\\/jQGh7r7PmGvSdfPr+65eVTjITD8\\/lTGIb8850v1fl3\\/i2R8Dv17jQIRyX5o9MXPSO6jHo4Swma5RzPA\\/0bRj6qRTyPkM1L9qEIr+2H2I7KKhT2ZE5GhAU7yI9A3VLBWzpTrUPMGbfpd1OjVTEqXAdMjpLDYI3Mh5zQ58p8xCzt+W+t0=\"}",
+        "id": "https://my-place.social/objects/e599373b-1368-4b20-cd24-837166957182",
+        "instrument": {
+            "id": "https://my-place.social/friendica",
+            "name": "Friendica 'Interrupted Fern' 2024.12-1576",
+            "type": "Application",
+            "url": "https://my-place.social"
+        },
+        "object": "https://pl.kotobank.ch/objects/301bce65-8a1b-4c49-a65c-fe2ce861a213",
+        "published": "2025-06-12T18:47:41Z",
+        "to": [
+            "https://pl.kotobank.ch/users/vaartis",
+            "https://mitra.social/users/silverpill",
+            "https://www.w3.org/ns/activitystreams#Public"
+        ],
+        "type": "Dislike"
+    },
+    "published": "2025-06-12T18:41:25Z",
+  "signature": {
+    "created": "2025-06-12T18:44:16Z",
+    "creator": "https://my-place.social/profile/vaartis#main-key",
+    "nonce": "2d67847d4bd4b1b83a30d61eac6cdc7ad6b980df06a8b9b97217e1d8f7b6cf20",
+    "signatureValue": "LnoRMZuQGDvTICkShGBq28ynaj2lF1bViJFGS6n4gKn3IbxPWATHxao43gxWRc+HCTrHNg7quzgaW4+PYM7UVUz3jO+bjNKsN845nijOVdyFrPOXbuaij3KQh2OoHhFJWoV/ZQQTFF0kRK1qT4BwG+P8NqOOKAMv+Cw7ruQH+f2w7uDgcNIbCD1gLcwb6cw7WVe5qu8yMkKqp2kBdqW3RCsI85RmmFgwehDgH5nrX7ER1qbeLWrqy7echwD9/fO3rqAu13xDNyiGZHDT7JB3RUt0AyMm0XCfjbwSQ0n+MkYXgE4asvFz81+iiPCLt+6gePWAFc5odF1FxdySBpSuUOs4p92NzP9OhQ0c0qrqrzYI7aYklY7oMfxjkva+X+0bm3up+2IRJdnZa/pXlmwdcqTpyMr1sgzaexMUNBp3dq7zA51eEaakLDX3i2onXJowfmze3+6XgPAFHYamR+pRNtuEoY4uyYEK3fj5GgwJ4RtFJMYVoEs/Q8h3OgYRcK1FE9UlDjSqbQ7QIRn2Ib4wjgmkeM0vrHIwh/1CtqA/M/6WuYFzCaJBc8O9ykpK9ZMbw64ToQXKf2SqhZsDoyTWRWTO1PXOk1XCAAElUh8/WCyeghvgqLXn0LHov4lmBsHA5iMUcLqBKD3GJIHd+ExrOFxMZs4mBLLGyz0p5joJ3NY=",
+    "type": "RsaSignature2017"
+  },
+  "to": [
+    "https://pl.kotobank.ch/users/vaartis",
+    "https://mitra.social/users/silverpill",
+    "https://www.w3.org/ns/activitystreams#Public"
+  ],
+  "type": "Undo"
+}

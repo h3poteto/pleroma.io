@@ -20,14 +20,20 @@ defmodule Pleroma.Web.CommonAPI.ActivityDraftTest do
     {:ok, local} = CommonAPI.post(user, %{status: ".", visibility: "local"})
     {:ok, public} = CommonAPI.post(user, %{status: ".", visibility: "public"})
 
-    {:error, _} = ActivityDraft.create(user, %{status: "nice", quote_id: direct.id})
-    {:ok, _} = ActivityDraft.create(user, %{status: "nice", quote_id: private.id})
-    {:error, _} = ActivityDraft.create(another_user, %{status: "nice", quote_id: private.id})
-    {:ok, _} = ActivityDraft.create(user, %{status: "nice", quote_id: unlisted.id})
-    {:ok, _} = ActivityDraft.create(another_user, %{status: "nice", quote_id: unlisted.id})
-    {:ok, _} = ActivityDraft.create(user, %{status: "nice", quote_id: local.id})
-    {:ok, _} = ActivityDraft.create(another_user, %{status: "nice", quote_id: local.id})
-    {:ok, _} = ActivityDraft.create(user, %{status: "nice", quote_id: public.id})
-    {:ok, _} = ActivityDraft.create(another_user, %{status: "nice", quote_id: public.id})
+    {:error, _} = ActivityDraft.create(user, %{status: "nice", quoted_status_id: direct.id})
+    {:ok, _} = ActivityDraft.create(user, %{status: "nice", quoted_status_id: private.id})
+
+    {:error, _} =
+      ActivityDraft.create(another_user, %{status: "nice", quoted_status_id: private.id})
+
+    {:ok, _} = ActivityDraft.create(user, %{status: "nice", quoted_status_id: unlisted.id})
+
+    {:ok, _} =
+      ActivityDraft.create(another_user, %{status: "nice", quoted_status_id: unlisted.id})
+
+    {:ok, _} = ActivityDraft.create(user, %{status: "nice", quoted_status_id: local.id})
+    {:ok, _} = ActivityDraft.create(another_user, %{status: "nice", quoted_status_id: local.id})
+    {:ok, _} = ActivityDraft.create(user, %{status: "nice", quoted_status_id: public.id})
+    {:ok, _} = ActivityDraft.create(another_user, %{status: "nice", quoted_status_id: public.id})
   end
 end

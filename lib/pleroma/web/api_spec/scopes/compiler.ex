@@ -26,7 +26,11 @@ defmodule Pleroma.Web.ApiSpec.Scopes.Compiler do
   end
 
   def extract_all_scopes do
-    extract_all_scopes_from(Pleroma.Web.ApiSpec.spec())
+    try do
+      extract_all_scopes_from(Pleroma.Web.ApiSpec.spec())
+    catch
+      _, _ -> []
+    end
   end
 
   def extract_all_scopes_from(specs) do

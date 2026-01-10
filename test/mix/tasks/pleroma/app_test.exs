@@ -42,9 +42,10 @@ defmodule Mix.Tasks.Pleroma.AppTest do
 
   test "with errors" do
     Mix.Tasks.Pleroma.App.run(["create"])
-    {:mix_shell, :error, ["Creating failed:"]}
-    {:mix_shell, :error, ["name: can't be blank"]}
-    {:mix_shell, :error, ["redirect_uris: can't be blank"]}
+
+    assert_receive {:mix_shell, :error, ["Creating failed:"]}
+    assert_receive {:mix_shell, :error, ["name: can't be blank"]}
+    assert_receive {:mix_shell, :error, ["redirect_uris: can't be blank"]}
   end
 
   defp assert_app(name, redirect, scopes) do

@@ -1,0 +1,54 @@
+ {
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://w3id.org/security/v1",
+    {
+      "Emoji": "toot:Emoji",
+      "Hashtag": "as:Hashtag",
+      "PropertyValue": "schema:PropertyValue",
+      "_misskey_content": "misskey:_misskey_content",
+      "_misskey_quote": "misskey:_misskey_quote",
+      "_misskey_reaction": "misskey:_misskey_reaction",
+      "_misskey_summary": "misskey:_misskey_summary",
+      "_misskey_votes": "misskey:_misskey_votes",
+      "backgroundUrl": "sharkey:backgroundUrl",
+      "discoverable": "toot:discoverable",
+      "featured": "toot:featured",
+      "fedibird": "http://fedibird.com/ns#",
+      "firefish": "https://joinfirefish.org/ns#",
+      "isCat": "misskey:isCat",
+      "listenbrainz": "sharkey:listenbrainz",
+      "manuallyApprovesFollowers": "as:manuallyApprovesFollowers",
+      "misskey": "https://misskey-hub.net/ns#",
+      "quoteUri": "fedibird:quoteUri",
+      "quoteUrl": "as:quoteUrl",
+      "schema": "http://schema.org#",
+      "sensitive": "as:sensitive",
+      "sharkey": "https://joinsharkey.org/ns#",
+      "speakAsCat": "firefish:speakAsCat",
+      "toot": "http://joinmastodon.org/ns#",
+      "value": "schema:value",
+      "vcard": "http://www.w3.org/2006/vcard/ns#"
+    }
+  ],
+  "_misskey_reaction": ":blobwtfnotlikethis:",
+  "actor": "https://mai.waifuism.life/users/9otxaeemjqy70001",
+  "content": ":blobwtfnotlikethis:",
+  "id": "https://mai.waifuism.life/likes/9q2xifhrdnb0001b",
+  "object": "https://bungle.online/notes/9q2xi2sy4k",
+  "tag": [
+    {
+      "icon": {
+        "mediaType": "image/png",
+        "type": "Image",
+        "url": "https://mai.waifuism.life/files/1b0510f2-1fb4-43f5-a399-10053bbd8f0f"
+      },
+      "id": "https://mai.waifuism.life/emojis/blobwtfnotlikethis",
+      "name": ":blobwtfnotlikethis:",
+      "type": "Emoji",
+      "updated": "2024-02-07T02:21:46.497Z"
+    }
+  ],
+  "type": "Like"
+}
+

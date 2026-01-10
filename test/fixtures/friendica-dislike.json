@@ -1,0 +1,56 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://w3id.org/security/v1",
+    {
+      "Hashtag": "as:Hashtag",
+      "PropertyValue": "schema:PropertyValue",
+      "conversation": "ostatus:conversation",
+      "dfrn": "http://purl.org/macgirvin/dfrn/1.0/",
+      "diaspora": "https://diasporafoundation.org/ns/",
+      "directMessage": "litepub:directMessage",
+      "discoverable": "toot:discoverable",
+      "featured": {
+        "@id": "toot:featured",
+        "@type": "@id"
+      },
+      "litepub": "http://litepub.social/ns#",
+      "manuallyApprovesFollowers": "as:manuallyApprovesFollowers",
+      "ostatus": "http://ostatus.org#",
+      "quoteUrl": "as:quoteUrl",
+      "schema": "http://schema.org#",
+      "sensitive": "as:sensitive",
+      "toot": "http://joinmastodon.org/ns#",
+      "value": "schema:value",
+      "vcard": "http://www.w3.org/2006/vcard/ns#"
+    }
+  ],
+  "actor": "https://my-place.social/profile/vaartis",
+  "cc": [
+    "https://my-place.social/followers/vaartis"
+  ],
+  "diaspora:guid": "e599373b-1968-4b20-cd24-80d340160302",
+  "diaspora:like": "{\"author\":\"vaartis@my-place.social\",\"guid\":\"e599373b-1968-4b20-cd24-80d340160302\",\"parent_guid\":\"cd36feba-c31f3ed3fd5c064a-17c31593\",\"parent_type\":\"Post\",\"positive\":\"false\",\"author_signature\":\"xR2zLJNfc9Nhx1n8LLMWM1kde12my4cqamIsrH\\/UntKzuDwO4DuHBL0fkFhgC\\/dylxm4HqsHD45MQbtwQCVGq6WhC96TrbMuYEK61HIO23dTr3m+qJVtfdH4wyhUNHgiiYPhZpkLDfnR1JiRWmFTlmZC8q8JEkOB5IQsrWia2eOR6IsqDcdKO\\/Urgns9\\/BdQi8KnchBKSEFc1iUtcOEruvhunKGyW5zI\\/Rltfdz3xGH8tlw+YlMXeWXPnqgOJ9GzNA0lwG4U421L6yylYagW7oxIznnBLB4bO46vYZbgXZV1hiI9ZyveHOinLMY1QkmTj5CNvnx3\\/VJwLovd0v+0Nr2vu\\/3ftbpBXc6L1bsNjlRqtsfwJlcgl+tH1DC4W8tKf+Y3tdtzVw0CHXCuacxHLyq5wZd\\/5YfYR9SJQ\\/jInU4PHA5+hIE3PGqNUp5QfFE0umq56H7MQKsIPgM5mMV4fPAA8OpltuMVDvQYUxalrnvoTf00k90x1wCTK71\\/jQGh7r7PmGvSdfPr+65eVTjITD8\\/lTGIb8850v1fl3\\/i2R8Dv17jQIRyX5o9MXPSO6jHo4Swma5RzPA\\/0bRj6qRTyPkM1L9qEIr+2H2I7KKhT2ZE5GhAU7yI9A3VLBWzpTrUPMGbfpd1OjVTEqXAdMjpLDYI3Mh5zQ58p8xCzt+W+t0=\"}",
+  "id": "https://my-place.social/objects/e599373b-1368-4b20-cd24-837166957182",
+  "instrument": {
+    "id": "https://my-place.social/friendica",
+    "name": "Friendica 'Interrupted Fern' 2024.12-1576",
+    "type": "Application",
+    "url": "https://my-place.social"
+  },
+  "object": "https://pl.kotobank.ch/objects/301bce65-8a1b-4c49-a65c-fe2ce861a213",
+  "published": "2025-06-12T18:47:41Z",
+  "signature": {
+    "created": "2025-06-12T18:47:42Z",
+    "creator": "https://my-place.social/profile/vaartis#main-key",
+    "nonce": "84e496f80b09d7a299c5cc89e8cadd13abf621b3a0a321684fa74278b68a6dd8",
+    "signatureValue": "qe2WxY+j7daIYLRadCctgal6A1s9XgoiMfM/8KjJm15w0sSizYYqruyQ5gS44e+cj5GHc9v5gP2ieod5v7eHAPzlcDI4bfkcyHVapAXTqU67ZebW+v6Q+21IMDgqrkYCv5TbV7LTxltW59dlqovpHE4TEe/M7xLKWJ3vVchRUcWqH9kDmak0nacoqYVAb5E9jYnQhUWPTCfPV82qQpeWQPOZ4iIvPw6rDkSSY5jL6bCogBZblHGpUjXfe/FPlacaCWiTQdoga3yOBXB1RYPw9nh5FI5Xkv/oi+52WmJrECinlD6AL8/BpiYvKz236zy7p/TR4BXlCx9RR/msjOnSabkQ4kmYFrRr80UDCGF+CdkdzLl8K9rSE3PbF1+nEqD7X0GOWn/DdtixqXJw6IR4bh32YW2SlcrSRBvI1p82Mv68BeqRaYqL6FAhKFwLhX5JpXngZ3k0g7rWWxc498voPWnFZDyCTRNxO9VIIUavDDEQ0BdFk6WDb8zx9tsAg8JoK57eVDcFly7tfVQffYiHpve06d8ag1DtzipqguRsURmuqpGNMq28XBTxwtrP2LnXXHKxoYN/YQ9cDnCKclbx7/uKmOVMLkLZlM0wAVoZpm5z2fG4voKqFiGZ1PoiFY2sN4URMArJtygV3PlTX4ASAQrak0ksvEo9msrBUD0Su9c=",
+    "type": "RsaSignature2017"
+  },
+  "to": [
+    "https://pl.kotobank.ch/users/vaartis",
+    "https://mitra.social/users/silverpill",
+    "https://www.w3.org/ns/activitystreams#Public"
+  ],
+  "type": "Dislike"
+}

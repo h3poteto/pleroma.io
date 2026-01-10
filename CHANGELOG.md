@@ -4,9 +4,113 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## 2.10
+
+### Security
+
+- Admin API: Fixed self-revocation vulnerability where admins could accidentally revoke their own admin status via the single-user permission endpoint
+- Fix bypass of the restrict unauthenticated setting by requesting local Activities
+
+### Changed
+
+- Add new activity actor/type index. Greatly speeds up retrieval of rare types (like "Listen")
+- Use separate schemas for muted/blocked accounts lists
+- Docs: Restore DB schema before data to avoid long restore times
+- Return 404 with a better error message instead of 400 when receiving an activity for a deactivated user
+- Deleting an instance queues individual jobs for each user that needs to be deleted from the server.
+- Update Dockerfile to use Elixir 1.17.3, Erlang 26.2.5.6, and Alpine 3.17.9 to match CI release builds
+- Docs RUM index: Add OTP install command, update index size expectation and recommend VACUUM FULL
+- Support new Mastodon API for endorsed accounts
+- Allow FediIndex crawler bot by default
+- Update Cowboy, Gun, and Plug family of dependencies
+- Hashtag searches return real results based on words in your query
+- Support `quoted_status_id` parameter in post creation request
+- Use Mastodon-compatible route for quotes list and param for quotes count
+- Updated the example Nginx configuration
+- Oban Notifier was changed to Oban.Notifiers.PG for performance and scalability benefits
+- Updated relayd/httpd config files to be on par with nginx
+- Order favourites and reblogs list from newest to oldest
+- Update Pleroma-FE to 2.9.2
+- Updated Postgrex library to 0.20.0
+- Improved the logic of how we determine if a server is unreachable.
+- Relax alsoKnownAs requirements to just URI, not necessarily HTTP(S)
+- Redirect /users/:nickname.rss to /users/:nickname/feed.rss instead of .atom
+- Add `write:scrobbles` and `read:scrobbles` scope for scrobbling
+- Change scrobble external link param name to use snake case
+- Allow "invisible" and "ellipsis" classes for span tags to match Mastodon behavior
+- Change SMTP example to use the Mua adapter that works with OTP>25
+- Updated Tesla to 1.15.3
+- Truncate the length of Rich Media title and description fields
+- Don't require an Accept header for WebFinger queries and default to JSON.
+
+### Added
+
+- Support Dislike activity, as sent by Mitra and Friendica, by changing it into a thumbs-down EmojiReact
+- Support Mitra-style emoji likes.
+- Added a way to upload new packs from a URL or ZIP file via Admin API
+- Add `duration` to the block endpoint, which makes block expire
+- Expose markup configuration in InstanceView
+- Allow filtering users with `accepts_chat_messages` capability
+- Add `timelines_access` to InstanceView
+- Implement language detection with fastText
+- Added MRF.QuietReply which prevents replies to public posts from being published to the timelines
+- Oban.Plugins.Lazarus to help recover stuck jobs from an unclean shutdown of Pleroma
+- Add /api/v1/pleroma/outgoing_follow_requests
+- Allow users to select preferred frontend
+- Provide full replies collection in ActivityPub objects
+- Allow anonymizing reports sent to remote servers
+- Add only_reblogs parameter to account statuses API for filtering to show only reblogs/reposts
+- Allow setting custom user-agent for fetching rich media content
+- Scrubber: Allow `quote-inline` class in <p> tags used by Mastodon quotes
+- Add `base_urls` to the /api/v1/instance pleroma metadata which provides information about the base URLs for media_proxy and uploads when configured
+- Stream marker updates
+- Allow Terms of Service panel behaviour to be configurable
+- Support translation providers (DeepL, LibreTranslate)
+- Support Mozhi translation provider
+- Support translateLocally translation provider
+
+### Fixed
+
+- AP C2S: Reject interactions with statuses not visible to Actor
+- Fix AssignAppUser migration OOM
+- Fix fetching public keys with authorized fetch enabled
+- Fix building "captcha" library with OpenBSD make
+- Use JSON for DeepL API requests
+- Elixir 1.18: Fixed warnings and new deprecations
+- Fix endorsement state display in relationship view
+- Fix publisher when publishing to a list of users
+- Fix reports being rejected when the activity had an empty CC or TO field (instead of not having them at all)
+- Set PATH in the FreeBSD rc script to avoid failures starting the service
+- Improved performance of status search queries using the default GIN index
+- Use end-of-string in regex for local `get_by_nickname`
+- Respect restrict_unauthenticated in /api/v1/accounts/lookup
+- MastodonAPI: Reject interactions with statuses not visible to user
+- Fix ModerationLog FunctionClauseError for unknown actions
+- MRF InlineQuotePolicy: Don't inline quoted post URL in Mastodon quote posts
+- Fix NodeInfo content-type
+- Add Actor images normalization from array of urls to string
+- Add `update` to @notification_types
+- replaced depracated flags and functions, renamed service to fit other service files
+- Allow to pin/unpip chats
+- Fix federation issue where Public visibility information in cc field was lost when sent to remote servers, causing posts to appear with inconsistent visibility across instances
+- OpenBSD relayd: Fix IPv6 example
+- Fix release builds
+- `remote_url` links to unproxied URL
+- Send push notifications for statuses from subscribed accounts
+- Backport [Elixir PR 14242](https://github.com/elixir-lang/elixir/pull/14242) fixing racy mkdir and lack of error handling of parent directory creation
+- Transmogrifier: convert "as:Public" to full w3 URL
+- Update voters count in remote polls when refreshing
+- Fix sometimes incorrect URI percent encoding
+- Fix HTTP client making invalid requests due to no percent encoding processing or validation.
+- ObjectView: Do not leak unsanitized internal representation of non-Create/non-Undo Activities on fetches
+- Fix WebFinger for split-domain setups
+- Enforce an exact domain match for WebFinger resolution
+- MastodonAPI: Fix misattribution of statuses when fetched via non-Announce Activity ID
+
 ## 2.9.1
 
 ### Security
+
 - Fix authorization checks for C2S Update activities to prevent unauthorized modifications of other users' content.
 - Fix content-type spoofing vulnerability that could allow users to upload ActivityPub objects as attachments
 - Reject cross-domain redirects when fetching ActivityPub objects to prevent bypassing domain-based security controls.
@@ -16,27 +120,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Validate Content-Type headers when fetching remote ActivityPub objects to prevent spoofing attacks.
 
 ### Changed
+
 - Include `pl-fe` in available frontends
 
 ### Fixed
+
 - Remove trailing ` from end of line 75 which caused issues copy-pasting
 
 ## 2.9.0
 
 ### Security
+
 - Require HTTP signatures (if enabled) for routes used by both C2S and S2S AP API
 - Fix several spoofing vectors
 
 ### Changed
-- Performance: Use 301 (permanent) redirect instead of 302 (temporary) when redirecting small images in media proxy. This allows browsers to cache the redirect response. 
+
+- Performance: Use 301 (permanent) redirect instead of 302 (temporary) when redirecting small images in media proxy. This allows browsers to cache the redirect response.
 
 ### Added
+
 - Include "published" in actor view
 - Link to exported outbox/followers/following collections in backup actor.json
 - Hashtag following
 - Allow to specify post language
 
 ### Fixed
+
 - Verify a local Update sent through AP C2S so users can only update their own objects
 - Fix Mastodon incoming edits with inlined "likes"
 - Allow incoming "Listen" activities
@@ -46,11 +156,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Fix blurhash generation crashes
 
 ### Removed
+
 - Retire MRFs DNSRBL, FODirectReply, and QuietReply
 
 ## 2.8.0
 
 ### Changed
+
 - Metadata: Do not include .atom feed links for remote accounts
 - Bumped `fast_html` to v2.3.0, which notably allows to use system-installed lexbor with passing `WITH_SYSTEM_LEXBOR=1` environment variable at build-time
 - Dedupe upload filter now uses a three-level sharding directory structure
@@ -71,6 +183,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Worker configuration is no longer available. This only affects custom max_retries values for a couple Oban queues.
 
 ### Added
+
 - Add metadata provider for ActivityPub alternate links
 - Added support for argon2 passwords and their conversion for migration from Akkoma fork to upstream.
 - Respect :restrict_unauthenticated for hashtag rss/atom feeds
@@ -88,6 +201,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Include session scopes in TokenView
 
 ### Fixed
+
 - Verify a local Update sent through AP C2S so users can only update their own objects
 - Fixed malformed follow requests that cause them to appear stuck pending due to the recipient being unable to process them.
 - Fix incoming Block activities being rejected
@@ -105,14 +219,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Make vapid_config return empty array, fixing preloading for instances without push notifications configured
 
 ### Removed
+
 - Remove stub for /api/v1/accounts/:id/identity_proofs (deprecated by Mastodon 3.5.0)
 
 ## 2.7.1
 
 ### Changed
+
 - Accept `application/activity+json` for requests to `/.well-known/nodeinfo`
 
 ### Fixed
+
 - Truncate remote user fields, avoids them getting rejected
 - Improve the `FollowValidator` to successfully incoming activities with an errant `cc` field.
 - Resolved edge case where the API can report you are following a user but the relationship is not fully established.
@@ -122,16 +239,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## 2.7.0
 
 ### Security
+
 - HTTP Security: By default, don't allow unsafe-eval. The setting needs to be changed to allow Flash emulation.
 - Fix webfinger spoofing.
 - Use proper workers for fetching pins instead of an ad-hoc task, fixing a potential fetch loop
 
 ### Changed
+
 - Update to Phoenix 1.7
 - Elixir Logger configuration is now longer permitted through AdminFE and ConfigDB
 - Refactor the user backups code and improve test coverage
 - Invalid activities delivered to the inbox will be rejected with a 400 Bad Request
-- Support Bandit as an alternative to Cowboy for the HTTP server. 
+- Support Bandit as an alternative to Cowboy for the HTTP server.
 - Update Bandit to 1.5.2
 - Replace eblurhash with rinpatch_blurhash. This also removes a dependency on ImageMagick.
 - Elixir 1.13 is the minimum required version.
@@ -170,6 +289,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Refactor the Mastodon /api/v1/streaming websocket handler to use Phoenix.Socket.Transport
 
 ### Added
+
 - Uploader: Add support for uploading attachments using IPFS
 - Add NSFW-detecting MRF
 - Add DNSRBL MRF
@@ -215,6 +335,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Support honk-style attachment summaries as alt-text.
 
 ### Fixed
+
 - Fix Emoji object IDs not always being valid
 - Remove checking ImageMagick's commands for Pleroma.Upload.Filter.AnalyzeMetadata
 - Ensure that StripLocation actually removes everything resembling GPS data from PNGs
@@ -257,7 +378,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Fix Optimistic Inbox for failed signatures
 - MediaProxy Preview failures prevented when encountering certain video files
 - pleroma_ctl: Use realpath(1) instead of readlink(1)
-- ReceiverWorker: Make sure non-{:ok, _} is returned as {:error, …}
+- ReceiverWorker: Make sure non-{:ok, \_} is returned as {:error, …}
 - Harden Rich Media parsing against very slow or malicious URLs
 - Rich Media Preview cache eviction when the activity is updated.
 - Parsing of RichMedia TTLs for Amazon URLs when query parameters are nil
@@ -269,32 +390,41 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Fix validate_webfinger when running a different domain for Webfinger
 
 ### Removed
+
 - Mastodon API: Remove deprecated GET /api/v1/statuses/:id/card endpoint https://github.com/mastodon/mastodon/pull/11213
 - Removed support for multiple federator modules as we only support ActivityPub
 
 ## 2.6.2
 
 ### Security
+
 - MRF StealEmojiPolicy: Sanitize shortcodes (thanks to Hazel K for the report
 
 ## 2.6.1
+
 ### Changed
+
 - - Document maximum supported version of Erlang & Elixir
 
 ### Added
+
 - [docs] add frontends management documentation
 
 ### Fixed
+
 - TwitterAPI: Return proper error when healthcheck is disabled
 - Fix eblurhash and elixir-captcha not using system cflags
 
 ## 2.6.0
+
 ### Security
+
 - Preload: Make generated JSON html-safe. It already was html safe because it only consists of config data that is base64 encoded, but this will keep it safe it that ever changes.
 - CommonAPI: Prevent users from accessing media of other users by creating a status with reused attachment ID
 - Disable XML entity resolution completely to fix a dos vulnerability
 
 ### Added
+
 - Support for Image activities, namely from Hubzilla
 - Add OAuth scope descriptions
 - Allow lang attribute in status text
@@ -305,6 +435,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Add unified streaming endpoint
 
 ### Fixed
+
 - rel="me" was missing its cache
 - MediaProxy responses now return a sandbox CSP header
 - Filter context activities using Visibility.visible_for_user?
@@ -326,6 +457,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Show more informative errors when profile exceeds char limits
 
 ### Removed
+
 - BREAKING: Support for passwords generated with `crypt(3)` (Gnu Social migration artifact)
 - remove BBS/SSH feature, replaced by an external bridge.
 - Remove a few unused indexes.
@@ -335,56 +467,67 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## 2.5.4
 
 ## Security
+
 - Fix XML External Entity (XXE) loading vulnerability allowing to fetch arbitrary files from the server's filesystem
 
 ## 2.5.3
 
 ### Security
+
 - Emoji pack loader sanitizes pack names
 - Reduced permissions of config files and directories, distros requiring greater permissions like group-read need to pre-create the directories
 
 ## 2.5.5
 
 ## Security
+
 - Prevent users from accessing media of other users by creating a status with reused attachment ID
 
 ## 2.5.4
 
 ## Security
+
 - Fix XML External Entity (XXE) loading vulnerability allowing to fetch arbitrary files from the server's filesystem
 
 ## 2.5.3
 
 ### Security
+
 - Emoji pack loader sanitizes pack names
 - Reduced permissions of config files and directories, distros requiring greater permissions like group-read need to pre-create the directories
 
 ## 2.5.2
 
 ### Security
+
 - `/proxy` endpoint now sets a Content-Security-Policy (sandbox)
 - WebSocket endpoint now respects unauthenticated restrictions for streams of public posts
 - OEmbed HTML tags are now filtered
 
 ### Changed
+
 - docs: Be more explicit about the level of compatibility of OTP releases
 - Set default background worker timeout to 15 minutes
 
 ### Fixed
+
 - Atom/RSS formatting (HTML truncation, published, missing summary)
 - Remove `static_fe` pipeline for `/users/:nickname/feed`
 - Stop oban from retrying if validating errors occur when processing incoming data
 - Make sure object refetching as used by already received polls follows MRF rules
 
 ### Removed
+
 - BREAKING: Support for passwords generated with `crypt(3)` (Gnu Social migration artifact)
 
 ## 2.5.1
 
 ### Added
+
 - Allow customizing instance languages
 
 ### Fixed
+
 - Security: uploading HTTP endpoint can no longer create directories in the upload dir (internal APIs, like backup, still can do it.)
 - ~ character in urls in Markdown posts are handled properly
 - Exiftool upload filter will now ignore SVG files
@@ -405,6 +548,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Quack, the logging backend that pushes to Slack channels
 
 ### Changed
+
 - **Breaking:** Elixir >=1.11 is now required (was >= 1.9)
 - Allow users to remove their emails if instance does not need email to register
 - Uploadfilter `Pleroma.Upload.Filter.Exiftool` has been renamed to `Pleroma.Upload.Filter.Exiftool.StripLocation`
@@ -415,6 +559,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - CSP now includes wasm-unsafe-eval
 
 ### Added
+
 - `activeMonth` and `activeHalfyear` fields in NodeInfo usage.users object
 - Experimental support for Finch. Put `config :tesla, :adapter, {Tesla.Adapter.Finch, name: MyFinch}` in your secrets file to use it. Reverse Proxy will still use Hackney.
 - `ForceMentionsInPostContent` MRF policy
@@ -436,6 +581,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Possibility to discover users like `user@example.org`, while Pleroma is working on `pleroma.example.org`. Additional configuration required.
 
 ### Fixed
+
 - Subscription(Bell) Notifications: Don't create from Pipeline Ingested replies
 - Handle Reject for already-accepted Follows properly
 - Display OpenGraph data on alternative notice routes.
@@ -458,6 +604,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## 2.4.5 - 2022-11-27
 
 ## Fixed
+
 - Image `class` attributes not being scrubbed, allowing to exploit frontend special classes [!3792](https://git.pleroma.social/pleroma/pleroma/-/merge_requests/3792)
 - Delete report notifs when demoting from superuser [!3642](https://git.pleroma.social/pleroma/pleroma/-/merge_requests/3642)
 - Validate `mediaType` only by it's format rather than using a list [!3597](https://git.pleroma.social/pleroma/pleroma/-/merge_requests/3597)
@@ -472,17 +619,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## 2.4.4 - 2022-08-19
 
 ### Security
+
 - Streaming API sessions will now properly disconnect if the corresponding token is revoked
 
 ## 2.4.3 - 2022-05-06
 
 ### Security
+
 - Private `/objects/` and `/activities/` leaking if cached by authenticated user
 - SweetXML library DTD bomb
 
 ## 2.4.2 - 2022-01-10
 
 ### Fixed
+
 - Federation issues caused by HTTP pool checkout timeouts
 - Compatibility with Elixir 1.13
 
@@ -493,12 +643,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## 2.4.1 - 2021-08-29
 
 ### Changed
+
 - Make `mix pleroma.database set_text_search_config` run concurrently and indefinitely
 
 ### Added
+
 - AdminAPI: Missing configuration description for StealEmojiPolicy
 
 ### Fixed
+
 - MastodonAPI: Stream out Create activities
 - MRF ObjectAgePolicy: Fix pattern matching on "published"
 - TwitterAPI: Make `change_password` and `change_email` require params on body instead of query
@@ -537,6 +690,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Pinned posts federation
 
 ### Fixed
+
 - Don't crash so hard when email settings are invalid.
 - Checking activated Upload Filters for required commands.
 - Remote users can no longer reappear after being deleted.
@@ -554,6 +708,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Fixed some Markdown issues, including trailing slash in links.
 
 ### Removed
+
 - **Breaking**: Remove deprecated `/api/qvitter/statuses/notifications/read` (replaced by `/api/v1/pleroma/notifications/read`)
 
 ## [2.3.0] - 2021-03-01
@@ -672,6 +827,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [2.2.1] - 2020-12-22
 
 ### Changed
+
 - Updated Pleroma FE
 
 ### Fixed
@@ -724,7 +880,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Breaking:** `Pleroma.Workers.Cron.ClearOauthTokenWorker` setting from Oban `:crontab` (moved to scheduled jobs).
 - **Breaking:** `Pleroma.Workers.Cron.PurgeExpiredActivitiesWorker` setting from Oban `:crontab` (moved to scheduled jobs).
 - Removed `:managed_config` option. In practice, it was accidentally removed with 2.0.0 release when frontends were
-switched to a new configuration mechanism, however it was not officially removed until now.
+  switched to a new configuration mechanism, however it was not officially removed until now.
 
 ### Added
 
@@ -755,8 +911,10 @@ switched to a new configuration mechanism, however it was not officially removed
 
 1. Install libmagic and development headers (`libmagic-dev` on Ubuntu/Debian, `file-dev` on Alpine Linux)
 2. Run database migrations (inside Pleroma directory):
-  - OTP: `./bin/pleroma_ctl migrate`
-  - From Source: `mix ecto.migrate`
+
+- OTP: `./bin/pleroma_ctl migrate`
+- From Source: `mix ecto.migrate`
+
 3. Restart Pleroma
 
 ## [2.1.2] - 2020-09-17
@@ -784,6 +942,7 @@ switched to a new configuration mechanism, however it was not officially removed
 ## [2.1.1] - 2020-09-08
 
 ### Security
+
 - Fix possible DoS in Mastodon API user search due to an error in match clauses, leading to an infinite recursion and subsequent OOM with certain inputs.
 - Fix metadata leak for accounts and statuses on private instances.
 - Fix possible DoS in Admin API search using an atom leak vulnerability. Authentication with admin rights was required to exploit.
@@ -794,6 +953,7 @@ switched to a new configuration mechanism, however it was not officially removed
 - Improved error message when cmake is not available at build stage.
 
 ### Added
+
 - Rich media failure tracking (along with `:failure_backoff` option).
 
 <details>
@@ -803,6 +963,7 @@ switched to a new configuration mechanism, however it was not officially removed
 </details>
 
 ### Fixed
+
 - Default HTTP adapter not respecting pool setting, leading to possible OOM.
 - Fixed uploading webp images when the Exiftool Upload Filter is enabled by skipping them
 - Mastodon API: Search parameter `following` now correctly returns the followings rather than the followers
@@ -908,6 +1069,7 @@ switched to a new configuration mechanism, however it was not officially removed
 </details>
 
 ### Fixed
+
 - Fix list pagination and other list issues.
 - Support pagination in conversations API
 - **Breaking**: SimplePolicy `:reject` and `:accept` allow deletions again
@@ -928,9 +1090,11 @@ switched to a new configuration mechanism, however it was not officially removed
 ## [2.0.7] - 2020-06-13
 
 ### Security
+
 - Fix potential DoSes exploiting atom leaks in rich media parser and the `UserAllowListPolicy` MRF policy
 
 ### Fixed
+
 - CSP: not allowing images/media from every host when mediaproxy is disabled
 - CSP: not adding mediaproxy base url to image/media hosts
 - StaticFE missing the CSS file
@@ -942,28 +1106,36 @@ switched to a new configuration mechanism, however it was not officially removed
 ## [2.0.6] - 2020-06-09
 
 ### Security
+
 - CSP: harden `image-src` and `media-src` when MediaProxy is used
 
 ### Fixed
+
 - AP C2S: Fix pagination in inbox/outbox
 - Various compilation errors on OTP 23
 - Mastodon API streaming: Repeats from muted threads not being filtered
 
 ### Changed
+
 - Various database performance improvements
 
 ### Upgrade notes
+
 1. Run database migrations (inside Pleroma directory):
-  - OTP: `./bin/pleroma_ctl migrate`
-  - From Source: `mix ecto.migrate`
+
+- OTP: `./bin/pleroma_ctl migrate`
+- From Source: `mix ecto.migrate`
+
 2. Restart Pleroma
 
 ## [2.0.5] - 2020-05-13
 
 ### Security
+
 - Fix possible private status leaks in Mastodon Streaming API
 
 ### Fixed
+
 - Crashes when trying to block a user if block federation is disabled
 - Not being able to start the instance without `erlang-eldap` installed
 - Users with bios over the limit getting rejected
@@ -976,9 +1148,11 @@ switched to a new configuration mechanism, however it was not officially removed
 ## [2.0.4] - 2020-05-10
 
 ### Security
+
 - AP C2S: Fix a potential DoS by creating nonsensical objects that break timelines
 
 ### Fixed
+
 - Peertube user lookups not working
 - `InsertSkeletonsForDeletedUsers` migration failing on some instances
 - Healthcheck reporting the number of memory currently used, rather than allocated in total
@@ -990,6 +1164,7 @@ switched to a new configuration mechanism, however it was not officially removed
 #### Apache only
 
 1. Remove the following line from your config:
+
 ```
     SSLCertificateFile      /etc/letsencrypt/live/${servername}/cert.pem
 ```
@@ -1001,11 +1176,13 @@ switched to a new configuration mechanism, however it was not officially removed
 ## [2.0.3] - 2020-05-02
 
 ### Security
+
 - Disallow re-registration of previously deleted users, which allowed viewing direct messages addressed to them
 - Mastodon API: Fix `POST /api/v1/follow_requests/:id/authorize` allowing to force a follow from a local user even if they didn't request to follow
 - CSP: Sandbox uploads
 
 ### Fixed
+
 - Notifications from blocked domains
 - Potential federation issues with Mastodon versions before 3.0.0
 - HTTP Basic Authentication permissions issue
@@ -1016,6 +1193,7 @@ switched to a new configuration mechanism, however it was not officially removed
 - `blob:` urls not being allowed by CSP
 
 ### Added
+
 - NodeInfo: ObjectAgePolicy settings to the `federation` list.
 - Follow request notifications
 <details>
@@ -1027,19 +1205,24 @@ switched to a new configuration mechanism, however it was not officially removed
 
 1. Restart Pleroma
 2. Run database migrations (inside Pleroma directory):
-  - OTP: `./bin/pleroma_ctl migrate`
-  - From Source: `mix ecto.migrate`
-3. Reset status visibility counters (inside Pleroma directory):
-  - OTP: `./bin/pleroma_ctl refresh_counter_cache`
-  - From Source: `mix pleroma.refresh_counter_cache`
 
+- OTP: `./bin/pleroma_ctl migrate`
+- From Source: `mix ecto.migrate`
+
+3. Reset status visibility counters (inside Pleroma directory):
+
+- OTP: `./bin/pleroma_ctl refresh_counter_cache`
+- From Source: `mix pleroma.refresh_counter_cache`
 
 ## [2.0.2] - 2020-04-08
+
 ### Added
+
 - Support for Funkwhale's `Audio` activity
 - Admin API: `PATCH /api/pleroma/admin/users/:nickname/update_credentials`
 
 ### Fixed
+
 - Blocked/muted users still generating push notifications
 - Input textbox for bio ignoring newlines
 - OTP: Inability to use PostgreSQL databases with SSL
@@ -1047,13 +1230,17 @@ switched to a new configuration mechanism, however it was not officially removed
 - Incorrect URL for Funkwhale channels
 
 ### Upgrade notes
+
 1. Restart Pleroma
 
 ## [2.0.1] - 2020-03-15
+
 ### Security
+
 - Static-FE: Fix remote posts not being sanitized
 
 ### Fixed
+
 - Rate limiter crashes when there is no explicitly specified ip in the config
 - 500 errors when no `Accept` header is present if Static-FE is enabled
 - Instance panel not being updated immediately due to wrong `Cache-Control` headers
@@ -1064,24 +1251,33 @@ switched to a new configuration mechanism, however it was not officially removed
 - Mastodon Streaming API: hashtag timelines not working
 
 ### Changed
+
 - BBCode and Markdown formatters will no longer return any `\n` and only use `<br/>` for newlines
 - Mastodon API: Allow registration without email if email verification is not enabled
 
 ### Upgrade notes
+
 #### Nginx only
+
 1. Remove `proxy_ignore_headers Cache-Control;` and `proxy_hide_header  Cache-Control;` from your config.
 
 #### Everyone
+
 1. Run database migrations (inside Pleroma directory):
-  - OTP: `./bin/pleroma_ctl migrate`
-  - From Source: `mix ecto.migrate`
+
+- OTP: `./bin/pleroma_ctl migrate`
+- From Source: `mix ecto.migrate`
+
 2. Restart Pleroma
 
 ## [2.0.0] - 2019-03-08
+
 ### Security
+
 - Mastodon API: Fix being able to request enormous amount of statuses in timelines leading to DoS. Now limited to 40 per request.
 
 ### Removed
+
 - **Breaking**: Removed 1.0+ deprecated configurations `Pleroma.Upload, :strip_exif` and `:instance, :dedupe_media`
 - **Breaking**: OStatus protocol support
 - **Breaking**: MDII uploader
@@ -1093,6 +1289,7 @@ switched to a new configuration mechanism, however it was not officially removed
 </details>
 
 ### Changed
+
 - **Breaking:** Pleroma won't start if it detects unapplied migrations
 - **Breaking:** Elixir >=1.8 is now required (was >= 1.7)
 - **Breaking:** `Pleroma.Plugs.RemoteIp` and `:rate_limiter` enabled by default. Please ensure your reverse proxy forwards the real IP!
@@ -1142,6 +1339,7 @@ switched to a new configuration mechanism, however it was not officially removed
 </details>
 
 ### Added
+
 - `:chat_limit` option to limit chat characters.
 - `cleanup_attachments` option to remove attachments along with statuses. Does not affect duplicate files and attachments without status. Enabling this will increase load to database when deleting statuses on larger instances.
 - Refreshing poll results for remote polls
@@ -1209,6 +1407,7 @@ switched to a new configuration mechanism, however it was not officially removed
 </details>
 
 ### Fixed
+
 - Report emails now include functional links to profiles of remote user accounts
 - Not being able to log in to some third-party apps when logged in to MastoFE
 - MRF: `Delete` activities being exempt from MRF policies
@@ -1228,7 +1427,9 @@ switched to a new configuration mechanism, however it was not officially removed
 </details>
 
 ## [1.1.9] - 2020-02-10
+
 ### Fixed
+
 - OTP: Inability to set the upload limit (again)
 - Not being able to pin polls
 - Streaming API: incorrect handling of reblog mutes
@@ -1236,98 +1437,132 @@ switched to a new configuration mechanism, however it was not officially removed
 - OpenGraph provider: html entities in descriptions
 
 ## [1.1.8] - 2020-01-10
+
 ### Fixed
+
 - Captcha generation issues
 - Returned Kocaptcha endpoint to configuration
 - Captcha validity is now 5 minutes
 
 ## [1.1.7] - 2019-12-13
+
 ### Fixed
+
 - OTP: Inability to set the upload limit
 - OTP: Inability to override node name/distribution type to run 2 Pleroma instances on the same machine
 
 ### Added
+
 - Integrated captcha provider
 
 ### Changed
+
 - Captcha enabled by default
 - Default Captcha provider changed from `Pleroma.Captcha.Kocaptcha` to `Pleroma.Captcha.Native`
 - Better `Cache-Control` header for static content
 
 ### Bundled Pleroma-FE Changes
+
 #### Added
+
 - Icons in the navigation panel
 
 #### Fixed
+
 - Improved support unauthenticated view of private instances
 
 #### Removed
+
 - Whitespace hack on empty post content
 
 ## [1.1.6] - 2019-11-19
+
 ### Fixed
+
 - Not being able to log into to third party apps when the browser is logged into mastofe
 - Email confirmation not being required even when enabled
 - Mastodon API: conversations API crashing when one status is malformed
 
 ### Bundled Pleroma-FE Changes
+
 #### Added
+
 - About page
 - Meme arrows
 
 #### Fixed
+
 - Image modal not closing unless clicked outside of image
 - Attachment upload spinner not being centered
 - Showing follow counters being 0 when they are actually hidden
 
 ## [1.1.5] - 2019-11-09
+
 ### Fixed
+
 - Polls having different numbers in timelines/notifications/poll api endpoints due to cache desyncronization
 - Pleroma API: OAuth token endpoint not being found when ".json" suffix is appended
 
 ### Changed
+
 - Frontend bundle updated to [044c9ad0](https://git.pleroma.social/pleroma/pleroma-fe/commit/044c9ad0562af059dd961d50961a3880fca9c642)
 
 ## [1.1.4] - 2019-11-01
+
 ### Fixed
+
 - Added a migration that fills up empty user.info fields to prevent breakage after previous unsafe migrations.
 - Failure to migrate from pre-1.0.0 versions
 - Mastodon API: Notification stream not including follow notifications
 
 ## [1.1.3] - 2019-10-25
+
 ### Fixed
+
 - Blocked users showing up in notifications collapsed as if they were muted
 - `pleroma_ctl` not working on Debian's default shell
 
 ## [1.1.2] - 2019-10-18
+
 ### Fixed
+
 - `pleroma_ctl` trying to connect to a running instance when generating the config, which of course doesn't exist.
 
 ## [1.1.1] - 2019-10-18
+
 ### Fixed
+
 - One of the migrations between 1.0.0 and 1.1.0 wiping user info of the relay user because of unexpected behavior of postgresql's `jsonb_set`, resulting in inability to post in the default configuration. If you were affected, please run the following query in postgres console, the relay user will be recreated automatically:
+
 ```
 delete from users where ap_id = 'https://your.instance.hostname/relay';
 ```
+
 - Bad user search matches
 
 ## [1.1.0] - 2019-10-14
+
 **Breaking:** The stable branch has been changed from `master` to `stable`. If you want to keep using 1.0, the `release/1.0` branch will receive security updates for 6 months after 1.1 release.
 
 **OTP Note:** `pleroma_ctl` in 1.0 defaults to `master` and doesn't support specifying arbitrary branches, making `./pleroma_ctl update` fail. To fix this, fetch a version of `pleroma_ctl` from 1.1 using the command below and proceed with the update normally:
+
 ```
 curl -Lo ./bin/pleroma_ctl 'https://git.pleroma.social/pleroma/pleroma/raw/develop/rel/files/bin/pleroma_ctl'
 ```
+
 ### Security
+
 - Mastodon API: respect post privacy in `/api/v1/statuses/:id/{favourited,reblogged}_by`
 
 ### Removed
+
 - **Breaking:** GNU Social API with Qvitter extensions support
 - Emoji: Remove longfox emojis.
 - Remove `Reply-To` header from report emails for admins.
 - ActivityPub: The `/objects/:uuid/likes` endpoint.
 
 ### Changed
+
 - **Breaking:** Configuration: A setting to explicitly disable the mailer was added, defaulting to true, if you are using a mailer add `config :pleroma, Pleroma.Emails.Mailer, enabled: true` to your config
 - **Breaking:** Configuration: `/media/` is now removed when `base_url` is configured, append `/media/` to your `base_url` config to keep the old behaviour if desired
 - **Breaking:** `/api/pleroma/notifications/read` is moved to `/api/v1/pleroma/notifications/read` and now supports `max_id` and responds with Mastodon API entities.
@@ -1341,10 +1576,11 @@ curl -Lo ./bin/pleroma_ctl 'https://git.pleroma.social/pleroma/pleroma/raw/devel
 - Mastodon API: `pleroma.thread_muted` key in the Status entity
 - AdminAPI: Add "godmode" while fetching user statuses (i.e. admin can see private statuses)
 - Improve digest email template
-– Pagination: (optional) return `total` alongside with `items` when paginating
+  – Pagination: (optional) return `total` alongside with `items` when paginating
 - The `Pleroma.FlakeId` module has been replaced with the `flake_id` library.
 
 ### Fixed
+
 - Following from Osada
 - Favorites timeline doing database-intensive queries
 - Metadata rendering errors resulting in the entire page being inaccessible
@@ -1377,6 +1613,7 @@ curl -Lo ./bin/pleroma_ctl 'https://git.pleroma.social/pleroma/pleroma/raw/devel
 - Reverse Proxy limiting `max_body_length` was incorrectly defined and only checked `Content-Length` headers which may not be sufficient in some circumstances
 
 ### Added
+
 - Expiring/ephemeral activities. All activities can have expires_at value set, which controls when they should be deleted automatically.
 - Mastodon API: in post_status, the expires_in parameter lets you set the number of seconds until an activity expires. It must be at least one hour.
 - Mastodon API: all status JSON responses contain a `pleroma.expires_at` item which states when an activity will expire. The value is only shown to the user who created the activity. To everyone else it's empty.
@@ -1420,24 +1657,33 @@ curl -Lo ./bin/pleroma_ctl 'https://git.pleroma.social/pleroma/pleroma/raw/devel
 - Reverse Proxy: Do not retry failed requests to limit pressure on the peer
 
 ### Changed
+
 - Configuration: Filter.AnonymizeFilename added ability to retain file extension with custom text
 - Admin API: changed json structure for saving config settings.
 - RichMedia: parsers and their order are configured in `rich_media` config.
 - RichMedia: add the rich media ttl based on image expiration time.
 
 ## [1.0.7] - 2019-09-26
+
 ### Fixed
+
 - Broken federation on Erlang 22 (previous versions of hackney http client were using an option that got deprecated)
+
 ### Changed
+
 - ActivityPub: The first page in inboxes/outboxes is no longer embedded.
 
 ## [1.0.6] - 2019-08-14
+
 ### Fixed
+
 - MRF: fix use of unserializable keyword lists in describe() implementations
 - ActivityPub S2S: POST requests are now signed with `(request-target)` pseudo-header.
 
 ## [1.0.5] - 2019-08-13
+
 ### Fixed
+
 - Mastodon API: follower/following counters not being nullified, when `hide_follows`/`hide_followers` is set
 - Mastodon API: `muted` in the Status entity, using author's account to determine if the thread was muted
 - Mastodon API: return the actual profile URL in the Account entity's `url` property when appropriate
@@ -1448,6 +1694,7 @@ curl -Lo ./bin/pleroma_ctl 'https://git.pleroma.social/pleroma/pleroma/raw/devel
 - Fix internal server error when using the healthcheck API.
 
 ### Added
+
 - **Breaking:** MRF describe API, which adds support for exposing configuration information about MRF policies to NodeInfo.
   Custom modules will need to be updated by adding, at the very least, `def describe, do: {:ok, %{}}` to the MRF policy modules.
 - Relays: Added a task to list relay subscriptions.
@@ -1459,21 +1706,28 @@ curl -Lo ./bin/pleroma_ctl 'https://git.pleroma.social/pleroma/pleroma/raw/devel
 - Configuration: `federation_incoming_replies_max_depth` option
 
 ### Removed
+
 - Federation: Remove `likes` from objects.
 - **Breaking:** ActivityPub: The `accept_blocks` configuration setting.
 
 ## [1.0.4] - 2019-08-01
+
 ### Fixed
+
 - Invalid SemVer version generation, when the current branch does not have commits ahead of tag/checked out on a tag
 
 ## [1.0.3] - 2019-07-31
+
 ### Security
+
 - OStatus: eliminate the possibility of a protocol downgrade attack.
 - OStatus: prevent following locked accounts, bypassing the approval process.
 - TwitterAPI: use CommonAPI to handle remote follows instead of OStatus.
 
 ## [1.0.2] - 2019-07-28
+
 ### Fixed
+
 - Not being able to pin unlisted posts
 - Mastodon API: represent poll IDs as strings
 - MediaProxy: fix matching filenames
@@ -1484,19 +1738,25 @@ curl -Lo ./bin/pleroma_ctl 'https://git.pleroma.social/pleroma/pleroma/raw/devel
 - ActivityPub S2S: remote user deletions now work the same as local user deletions.
 
 ### Changed
+
 - Configuration: OpenGraph and TwitterCard providers enabled by default
 - Configuration: Filter.AnonymizeFilename added ability to retain file extension with custom text
 
 ## [1.0.1] - 2019-07-14
+
 ### Security
+
 - OStatus: fix an object spoofing vulnerability.
 
 ## [1.0.0] - 2019-06-29
+
 ### Security
+
 - Mastodon API: Fix display names not being sanitized
 - Rich media: Do not crawl private IP ranges
 
 ### Added
+
 - Digest email for inactive users
 - Add a generic settings store for frontends / clients to use.
 - Explicit addressing option for posting.
@@ -1561,6 +1821,7 @@ curl -Lo ./bin/pleroma_ctl 'https://git.pleroma.social/pleroma/pleroma/raw/devel
 - Configuration: default syslog tag "Pleroma" is now lowercased to "pleroma"
 
 ### Changed
+
 - **Breaking:** bind to 127.0.0.1 instead of 0.0.0.0 by default
 - **Breaking:** Configuration: move from Pleroma.Mailer to Pleroma.Emails.Mailer
 - Thread containment / test for complete visibility will be skipped by default.
@@ -1602,6 +1863,7 @@ curl -Lo ./bin/pleroma_ctl 'https://git.pleroma.social/pleroma/pleroma/raw/devel
 - Rich Media: crawl only https URLs.
 
 ### Fixed
+
 - Follow requests don't get 'stuck' anymore.
 - Added an FTS index on objects. Running `vacuum analyze` and setting a larger `work_mem` is recommended.
 - Followers counter not being updated when a follower is blocked
@@ -1637,31 +1899,48 @@ curl -Lo ./bin/pleroma_ctl 'https://git.pleroma.social/pleroma/pleroma/raw/devel
 - MRF: Simple policy now properly delists imported or relayed statuses
 
 ## Removed
+
 - Configuration: `config :pleroma, :fe` in favor of the more flexible `config :pleroma, :frontend_configurations`
 
 ## [0.9.99999] - 2019-05-31
+
 ### Security
+
 - Mastodon API: Fix lists leaking private posts
 
 ## [0.9.9999] - 2019-04-05
+
 ### Security
+
 - Mastodon API: Fix content warnings skipping HTML sanitization
 
 ## [0.9.999] - 2019-03-13
+
 Frontend changes only.
+
 ### Added
+
 - Added floating action button for posting status on mobile
+
 ### Changed
+
 - Changed user-settings icon to a pencil
+
 ### Fixed
+
 - Keyboard shortcuts activating when typing a message
 - Gaps when scrolling down on a timeline after showing new
 
 ## [0.9.99] - 2019-03-08
+
 ### Changed
+
 - Update the frontend to the 0.9.99 tag
+
 ### Fixed
+
 - Sign the date header in federation to fix Mastodon federation.
 
 ## [0.9.9] - 2019-02-22
+
 This is our first stable release.

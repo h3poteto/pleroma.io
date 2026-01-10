@@ -56,10 +56,6 @@ defmodule Pleroma.SafeZip do
                {_, true} <- {:safe_path, safe_path?(path)} do
             {:cont, {:ok, maybe_add_file(type, path, fl)}}
           else
-            {:get_type, e} ->
-              {:halt,
-               {:error, "Couldn't determine file type of ZIP entry at #{path} (#{inspect(e)})"}}
-
             {:type, _} ->
               {:halt, {:error, "Potentially unsafe file type in ZIP at: #{path}"}}
 

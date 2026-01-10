@@ -5,6 +5,7 @@
 defmodule Pleroma.Web.CommonAPI.ActivityDraft do
   alias Pleroma.Activity
   alias Pleroma.Conversation.Participation
+  alias Pleroma.Language.LanguageDetector
   alias Pleroma.Object
   alias Pleroma.Web.ActivityPub.Builder
   alias Pleroma.Web.ActivityPub.Visibility
@@ -90,7 +91,8 @@ defmodule Pleroma.Web.CommonAPI.ActivityDraft do
   defp listen_object(draft) do
     object =
       draft.params
-      |> Map.take([:album, :artist, :title, :length, :externalLink])
+      |> Map.take([:album, :artist, :title, :length])
+      |> Map.put(:externalLink, Map.get(draft.params, :external_link))
       |> Map.new(fn {key, value} -> {to_string(key), value} end)
       |> Map.put("type", "Audio")
       |> Map.put("to", draft.to)
@@ -134,22 +136,34 @@ defmodule Pleroma.Web.CommonAPI.ActivityDraft do
 
   defp in_reply_to(%{params: %{in_reply_to_status_id: ""}} = draft), do: draft
 
-  defp in_reply_to(%{params: %{in_reply_to_status_id: :deleted}} = draft) do
-    add_error(draft, dgettext("errors", "Cannot reply to a deleted status"))
-  end
+  defp in_reply_to(%{params: %{in_reply_to_status_id: id}} = draft) when is_binary(id) do
+    # If a post was deleted all its activities (except the newly added Delete) are purged too,
+    # thus lookup by Create db ID will yield nil just as if it never existed in the first place.
+    #
+    # We allow replying to Announce here, due to a Pleroma-FE quirk where if presented with
+    # an Announce id it will render it as if it was just the normal referenced post, but
+    # use the Announce id for replies in the in_reply_to_id key of a POST request to
+    # /api/v1/statuses, or as an :id in /api/v1/statuses/:id/*.
+    # TODO: Fix this quirk in FE and remove here and other affected places
+    with %Activity{} = activity <- Activity.get_by_id(id),
+         true <- Visibility.visible_for_user?(activity, draft.user),
+         {_, type} when type in ["Create", "Announce"] <- {:type, activity.data["type"]} do
+      %__MODULE__{draft | in_reply_to: activity}
+    else
+      nil ->
+        add_error(draft, dgettext("errors", "Cannot reply to a deleted status"))
 
-  defp in_reply_to(%{params: %{in_reply_to_status_id: id} = params} = draft) when is_binary(id) do
-    activity = Activity.get_by_id(id)
+      false ->
+        add_error(draft, dgettext("errors", "Record not found"))
 
-    params =
-      if is_nil(activity) do
-        # Deleted activities are returned as nil
-        Map.put(params, :in_reply_to_status_id, :deleted)
-      else
-        Map.put(params, :in_reply_to_status_id, activity)
-      end
-
-    in_reply_to(%{draft | params: params})
+      {:type, type} ->
+        add_error(
+          draft,
+          dgettext("errors", "Can only reply to posts, not %{type} activities",
+            type: inspect(type)
+          )
+        )
+    end
   end
 
   defp in_reply_to(%{params: %{in_reply_to_status_id: %Activity{} = in_reply_to}} = draft) do
@@ -158,7 +172,7 @@ defmodule Pleroma.Web.CommonAPI.ActivityDraft do
 
   defp in_reply_to(draft), do: draft
 
-  defp quote_post(%{params: %{quote_id: id}} = draft) when not_empty_string(id) do
+  defp quote_post(%{params: %{quoted_status_id: id}} = draft) when not_empty_string(id) do
     case Activity.get_by_id_with_object(id) do
       %Activity{} = activity ->
         %__MODULE__{draft | quote_post: activity}
@@ -166,6 +180,10 @@ defmodule Pleroma.Web.CommonAPI.ActivityDraft do
       _ ->
         draft
     end
+  end
+
+  defp quote_post(%{params: %{quote_id: id}} = draft) when not_empty_string(id) do
+    quote_post(%{draft | params: Map.put(draft.params, :quoted_status_id, id)})
   end
 
   defp quote_post(draft), do: draft
@@ -255,13 +273,15 @@ defmodule Pleroma.Web.CommonAPI.ActivityDraft do
   end
 
   defp language(draft) do
-    language = draft.params[:language]
+    language =
+      with language <- draft.params[:language],
+           true <- good_locale_code?(language) do
+        language
+      else
+        _ -> LanguageDetector.detect(draft.content_html <> " " <> draft.summary)
+      end
 
-    if good_locale_code?(language) do
-      %__MODULE__{draft | language: language}
-    else
-      draft
-    end
+    %__MODULE__{draft | language: language}
   end
 
   defp object(draft) do

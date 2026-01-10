@@ -7,6 +7,7 @@ defmodule Pleroma.Web.ApiSpec.ReportOperation do
   alias OpenApiSpex.Schema
   alias Pleroma.Web.ApiSpec.Helpers
   alias Pleroma.Web.ApiSpec.Schemas.ApiError
+  alias Pleroma.Web.ApiSpec.Schemas.ApiNotFoundError
   alias Pleroma.Web.ApiSpec.Schemas.BooleanLike
 
   def open_api_operation(action) do
@@ -24,7 +25,8 @@ defmodule Pleroma.Web.ApiSpec.ReportOperation do
       requestBody: Helpers.request_body("Parameters", create_request(), required: true),
       responses: %{
         200 => Operation.response("Report", "application/json", create_response()),
-        400 => Operation.response("Report", "application/json", ApiError)
+        400 => Operation.response("Report", "application/json", ApiError),
+        404 => Operation.response("Report", "application/json", ApiNotFoundError)
       }
     }
   end

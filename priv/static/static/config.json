@@ -24,6 +24,8 @@
   "showInstanceSpecificPanel": false,
   "sidebarRight": false,
   "subjectLineBehavior": "email",
-  "theme": "pleroma-dark",
+  "theme": null,
+  "style": null,
+  "palette": null,
   "webPushNotifications": false
 }

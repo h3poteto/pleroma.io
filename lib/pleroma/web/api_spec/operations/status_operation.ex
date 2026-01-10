@@ -8,6 +8,7 @@ defmodule Pleroma.Web.ApiSpec.StatusOperation do
   alias Pleroma.Web.ApiSpec.AccountOperation
   alias Pleroma.Web.ApiSpec.Schemas.Account
   alias Pleroma.Web.ApiSpec.Schemas.ApiError
+  alias Pleroma.Web.ApiSpec.Schemas.ApiNotFoundError
   alias Pleroma.Web.ApiSpec.Schemas.Attachment
   alias Pleroma.Web.ApiSpec.Schemas.BooleanLike
   alias Pleroma.Web.ApiSpec.Schemas.Emoji
@@ -177,6 +178,7 @@ defmodule Pleroma.Web.ApiSpec.StatusOperation do
       parameters: [id_param()],
       responses: %{
         200 => status_response(),
+        400 => Operation.response("Error", "application/json", ApiError),
         404 => Operation.response("Not Found", "application/json", ApiError)
       }
     }
@@ -242,14 +244,19 @@ defmodule Pleroma.Web.ApiSpec.StatusOperation do
               "error" => "You have already pinned the maximum number of statuses"
             }
           }),
-        404 =>
-          Operation.response("Not found", "application/json", %Schema{
-            allOf: [ApiError],
-            title: "Unprocessable Entity",
-            example: %{
-              "error" => "Record not found"
+        404 => Operation.response("Not found", "application/json", ApiNotFoundError),
+        422 =>
+          Operation.response(
+            "Unprocessable Entity",
+            "application/json",
+            %Schema{
+              allOf: [ApiError],
+              title: "Unprocessable Entity",
+              example: %{
+                "error" => "Someone else's status cannot be unpinned"
+              }
             }
-          })
+          )
       }
     }
   end
@@ -275,7 +282,8 @@ defmodule Pleroma.Web.ApiSpec.StatusOperation do
           }
         }),
       responses: %{
-        200 => status_response()
+        200 => status_response(),
+        404 => Operation.response("Not found", "application/json", ApiNotFoundError)
       }
     }
   end
@@ -289,7 +297,8 @@ defmodule Pleroma.Web.ApiSpec.StatusOperation do
       operationId: "StatusController.unbookmark",
       parameters: [id_param()],
       responses: %{
-        200 => status_response()
+        200 => status_response(),
+        404 => Operation.response("Not found", "application/json", ApiNotFoundError)
       }
     }
   end
@@ -324,7 +333,8 @@ defmodule Pleroma.Web.ApiSpec.StatusOperation do
       ],
       responses: %{
         200 => status_response(),
-        400 => Operation.response("Error", "application/json", ApiError)
+        400 => Operation.response("Error", "application/json", ApiError),
+        404 => Operation.response("Not found", "application/json", ApiNotFoundError)
       }
     }
   end
@@ -340,7 +350,8 @@ defmodule Pleroma.Web.ApiSpec.StatusOperation do
       parameters: [id_param()],
       responses: %{
         200 => status_response(),
-        400 => Operation.response("Error", "application/json", ApiError)
+        400 => Operation.response("Error", "application/json", ApiError),
+        404 => Operation.response("Not Found", "application/json", ApiNotFoundError)
       }
     }
   end
@@ -423,6 +434,38 @@ defmodule Pleroma.Web.ApiSpec.StatusOperation do
       parameters: [id_param()],
       responses: %{
         200 => Operation.response("Context", "application/json", context())
+      }
+    }
+  end
+
+  def translate_operation do
+    %Operation{
+      tags: ["Retrieve status information"],
+      summary: "Translate status",
+      description: "Translate status with an external API",
+      operationId: "StatusController.translate",
+      security: [%{"oAuth" => ["read:statuses"]}],
+      parameters: [id_param()],
+      requestBody:
+        request_body(
+          "Parameters",
+          %Schema{
+            type: :object,
+            properties: %{
+              lang: %Schema{
+                type: :string,
+                nullable: true,
+                description: "Translation target language."
+              }
+            }
+          },
+          required: false
+        ),
+      responses: %{
+        200 => Operation.response("Translation", "application/json", translation()),
+        400 => Operation.response("Error", "application/json", ApiError),
+        404 => Operation.response("Error", "application/json", ApiError),
+        503 => Operation.response("Error", "application/json", ApiError)
       }
     }
   end
@@ -517,6 +560,27 @@ defmodule Pleroma.Web.ApiSpec.StatusOperation do
     }
   end
 
+  def quotes_operation do
+    %Operation{
+      tags: ["Retrieve status information"],
+      summary: "Quoted by",
+      description: "View quotes for a given status",
+      operationId: "StatusController.quotes",
+      parameters: [id_param() | pagination_params()],
+      security: [%{"oAuth" => ["read:statuses"]}],
+      responses: %{
+        200 =>
+          Operation.response(
+            "Array of Status",
+            "application/json",
+            array_of_statuses()
+          ),
+        403 => Operation.response("Forbidden", "application/json", ApiError),
+        404 => Operation.response("Not Found", "application/json", ApiError)
+      }
+    }
+  end
+
   def array_of_statuses do
     %Schema{type: :array, items: Status, example: [Status.schema().example]}
   end
@@ -567,6 +631,20 @@ defmodule Pleroma.Web.ApiSpec.StatusOperation do
           nullable: true,
           description: "ISO 639 language code for this status."
         },
+        visibility: %Schema{
+          nullable: true,
+          anyOf: [
+            VisibilityScope,
+            %Schema{type: :string, description: "`list:LIST_ID`", example: "LIST:123"}
+          ],
+          description:
+            "Visibility of the posted status. Besides standard MastoAPI values (`direct`, `private`, `unlisted` or `public`) it can be used to address a List by setting it to `list:LIST_ID`"
+        },
+        quoted_status_id: %Schema{
+          nullable: true,
+          allOf: [FlakeID],
+          description: "ID of the status being quoted, if any"
+        },
         # Pleroma-specific properties:
         preview: %Schema{
           allOf: [BooleanLike],
@@ -587,15 +665,6 @@ defmodule Pleroma.Web.ApiSpec.StatusOperation do
           description:
             "A list of nicknames (like `lain@soykaf.club` or `lain` on the local server) that will be used to determine who is going to be addressed by this post. Using this will disable the implicit addressing by mentioned names in the `status` body, only the people in the `to` list will be addressed. The normal rules for for post visibility are not affected by this and will still apply"
         },
-        visibility: %Schema{
-          nullable: true,
-          anyOf: [
-            VisibilityScope,
-            %Schema{type: :string, description: "`list:LIST_ID`", example: "LIST:123"}
-          ],
-          description:
-            "Visibility of the posted status. Besides standard MastoAPI values (`direct`, `private`, `unlisted` or `public`) it can be used to address a List by setting it to `list:LIST_ID`"
-        },
         expires_in: %Schema{
           nullable: true,
           type: :integer,
@@ -611,7 +680,8 @@ defmodule Pleroma.Web.ApiSpec.StatusOperation do
         quote_id: %Schema{
           nullable: true,
           allOf: [FlakeID],
-          description: "ID of the status being quoted, if any"
+          description: "Deprecated in favor of `quoted_status_id`",
+          deprecated: true
         }
       },
       example: %{
@@ -816,6 +886,34 @@ defmodule Pleroma.Web.ApiSpec.StatusOperation do
       example: %{
         "ancestors" => [Status.schema().example],
         "descendants" => [Status.schema().example]
+      }
+    }
+  end
+
+  defp translation do
+    %Schema{
+      title: "StatusTranslation",
+      description: "Represents status translation with related information.",
+      type: :object,
+      required: [:content, :detected_source_language, :provider],
+      properties: %{
+        content: %Schema{
+          type: :string,
+          description: "Translated status content"
+        },
+        detected_source_language: %Schema{
+          type: :string,
+          description: "Detected source language"
+        },
+        provider: %Schema{
+          type: :string,
+          description: "Translation provider service name"
+        }
+      },
+      example: %{
+        "content" => "Software für die nächste Generation der sozialen Medien.",
+        "detected_source_language" => "en",
+        "provider" => "Deepl"
       }
     }
   end

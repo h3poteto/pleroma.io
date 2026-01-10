@@ -19,7 +19,7 @@ defmodule Pleroma.Uploaders.Local do
 
         [file | folders] ->
           path = Path.join([upload_path()] ++ Enum.reverse(folders))
-          File.mkdir_p!(path)
+          Pleroma.Backports.mkdir_p!(path)
           {path, file}
       end
 

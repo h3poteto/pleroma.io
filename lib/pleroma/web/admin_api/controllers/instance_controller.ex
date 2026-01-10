@@ -49,7 +49,7 @@ defmodule Pleroma.Web.AdminAPI.InstanceController do
   end
 
   def delete(conn, %{"instance" => instance}) do
-    with {:ok, _job} <- Instance.delete_users_and_activities(instance) do
+    with {:ok, _job} <- Instance.delete(instance) do
       json(conn, instance)
     end
   end

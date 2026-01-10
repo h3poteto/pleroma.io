@@ -193,7 +193,7 @@ defmodule Pleroma.User.Backup do
     backup = Repo.preload(backup, :user)
     tempfile = Path.join([backup.tempdir, backup.file_name])
 
-    with {_, :ok} <- {:mkdir, File.mkdir_p(backup.tempdir)},
+    with {_, :ok} <- {:mkdir, Pleroma.Backports.mkdir_p(backup.tempdir)},
          {_, :ok} <- {:actor, actor(backup.tempdir, backup.user)},
          {_, :ok} <- {:statuses, statuses(backup.tempdir, backup.user)},
          {_, :ok} <- {:likes, likes(backup.tempdir, backup.user)},

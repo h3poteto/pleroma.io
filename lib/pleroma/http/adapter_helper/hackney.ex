@@ -16,7 +16,12 @@ defmodule Pleroma.HTTP.AdapterHelper.Hackney do
 
     config_opts = Pleroma.Config.get([:http, :adapter], [])
 
+    url_encoding =
+      Keyword.new()
+      |> Keyword.put(:path_encode_fun, fn path -> path end)
+
     @defaults
+    |> Keyword.merge(url_encoding)
     |> Keyword.merge(config_opts)
     |> Keyword.merge(connection_opts)
     |> add_scheme_opts(uri)

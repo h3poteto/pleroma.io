@@ -337,6 +337,41 @@ defmodule Pleroma.Web.PleromaAPI.ChatControllerTest do
     end
   end
 
+  describe "POST /api/v1/pleroma/chats/:id/pin" do
+    setup do: oauth_access(["write:chats"])
+
+    test "it pins a chat", %{conn: conn, user: user} do
+      other_user = insert(:user)
+
+      {:ok, chat} = Chat.get_or_create(user.id, other_user.ap_id)
+
+      result =
+        conn
+        |> post("/api/v1/pleroma/chats/#{chat.id}/pin")
+        |> json_response_and_validate_schema(200)
+
+      assert %{"pinned" => true} = result
+    end
+  end
+
+  describe "POST /api/v1/pleroma/chats/:id/unpin" do
+    setup do: oauth_access(["write:chats"])
+
+    test "it unpins a chat", %{conn: conn, user: user} do
+      other_user = insert(:user)
+
+      {:ok, chat} = Chat.get_or_create(user.id, other_user.ap_id)
+      {:ok, chat} = Chat.pin(chat)
+
+      result =
+        conn
+        |> post("/api/v1/pleroma/chats/#{chat.id}/unpin")
+        |> json_response_and_validate_schema(200)
+
+      assert %{"pinned" => false} = result
+    end
+  end
+
   for tested_endpoint <- ["/api/v1/pleroma/chats", "/api/v2/pleroma/chats"] do
     describe "GET #{tested_endpoint}" do
       setup do: oauth_access(["read:chats"])
@@ -405,6 +440,21 @@ defmodule Pleroma.Web.PleromaAPI.ChatControllerTest do
           |> json_response_and_validate_schema(200)
 
         assert length(result) == 1
+      end
+
+      test "it only returns pinned chats", %{conn: conn, user: user} do
+        recipient1 = insert(:user)
+        recipient2 = insert(:user)
+
+        {:ok, %{id: id} = chat} = Chat.get_or_create(user.id, recipient1.ap_id)
+        {:ok, _} = Chat.get_or_create(user.id, recipient2.ap_id)
+
+        Chat.pin(chat)
+
+        [%{"id" => ^id, "pinned" => true}] =
+          conn
+          |> get("#{unquote(tested_endpoint)}?pinned=true")
+          |> json_response_and_validate_schema(200)
       end
 
       if tested_endpoint == "/api/v1/pleroma/chats" do

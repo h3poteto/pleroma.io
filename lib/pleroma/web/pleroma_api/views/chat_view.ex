@@ -24,7 +24,8 @@ defmodule Pleroma.Web.PleromaAPI.ChatView do
       last_message:
         last_message &&
           MessageReferenceView.render("show.json", chat_message_reference: last_message),
-      updated_at: Utils.to_masto_date(chat.updated_at)
+      updated_at: Utils.to_masto_date(chat.updated_at),
+      pinned: chat.pinned
     }
   end
 

@@ -51,7 +51,7 @@ defmodule Pleroma.Search.QdrantSearchTest do
         })
 
       Config
-      |> expect(:get, 3, fn
+      |> expect(:get, 4, fn
         [Pleroma.Search, :module], nil ->
           QdrantSearch
 
@@ -93,7 +93,7 @@ defmodule Pleroma.Search.QdrantSearchTest do
         })
 
       Config
-      |> expect(:get, 3, fn
+      |> expect(:get, 4, fn
         [Pleroma.Search, :module], nil ->
           QdrantSearch
 
@@ -158,7 +158,7 @@ defmodule Pleroma.Search.QdrantSearchTest do
       end)
 
       Config
-      |> expect(:get, 6, fn
+      |> expect(:get, 7, fn
         [Pleroma.Search, :module], nil ->
           QdrantSearch
 

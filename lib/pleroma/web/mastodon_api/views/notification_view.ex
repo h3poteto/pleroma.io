@@ -106,26 +106,14 @@ defmodule Pleroma.Web.MastodonAPI.NotificationView do
     }
 
     case notification.type do
-      "mention" ->
+      type when type in ["mention", "status", "poll"] ->
         put_status(response, activity, reading_user, status_render_opts)
 
-      "status" ->
-        put_status(response, activity, reading_user, status_render_opts)
-
-      "favourite" ->
-        put_status(response, parent_activity_fn.(), reading_user, status_render_opts)
-
-      "reblog" ->
-        put_status(response, parent_activity_fn.(), reading_user, status_render_opts)
-
-      "update" ->
+      type when type in ["favourite", "reblog", "update"] ->
         put_status(response, parent_activity_fn.(), reading_user, status_render_opts)
 
       "move" ->
         put_target(response, activity, reading_user, %{})
-
-      "poll" ->
-        put_status(response, activity, reading_user, status_render_opts)
 
       "pleroma:emoji_reaction" ->
         response

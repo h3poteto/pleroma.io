@@ -22,7 +22,7 @@ defmodule Mix.Tasks.Pleroma.RobotsTxt do
     static_dir = Pleroma.Config.get([:instance, :static_dir], "instance/static/")
 
     if !File.exists?(static_dir) do
-      File.mkdir_p!(static_dir)
+      Pleroma.Backports.mkdir_p!(static_dir)
     end
 
     robots_txt_path = Path.join(static_dir, "robots.txt")

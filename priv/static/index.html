@@ -1,1 +1,52 @@
-<!DOCTYPE html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1,user-scalable=no"><link rel=icon type=image/png href=/favicon.png><style id=pleroma-eager-styles type=text/css></style><style id=pleroma-lazy-styles type=text/css></style><!--server-generated-meta--><script defer=defer src=/static/js/6561.24d12b4e33b21319845b.js></script><script defer=defer src=/static/js/app.3fbb12e9679dc0e0aa33.js></script><link href=/static/css/app.75b043cffb8e922bc29e.css rel=stylesheet></head><body class=hidden><noscript>To use Pleroma, please enable JavaScript.</noscript><div id=app></div><div id=modal></div><div id=popovers></body></html>
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1,user-scalable=no">
+    <link rel="preload" href="/static/config.json" as="fetch" crossorigin />
+    <link rel="preload" href="/api/pleroma/frontend_configurations" as="fetch" crossorigin />
+    <link rel="preload" href="/nodeinfo/2.0.json" as="fetch" crossorigin />
+    <link rel="preload" href="/nodeinfo/2.1.json" as="fetch" crossorigin />
+    <link rel="preload" href="/api/v1/instance" as="fetch" crossorigin />
+    <link rel="preload" href="/static/pleromatan_apology_fox_small.webp" as="image" />
+    <!-- putting styles here to avoid having to wait for styles to load up -->
+    <link rel="stylesheet" id="splashscreen" href="/static/splash.css" />
+    <link rel="stylesheet" id="custom-styles-holder" type="text/css" href="/static/empty.css" />
+    <!--server-generated-meta-->
+    <script type="module" crossorigin src="/static/js/main.qxCxIqDs.js"></script>
+    <link rel="stylesheet" crossorigin href="/static/css/main.CF7uYwoC.css">
+  </head>
+  <body>
+    <noscript>To use Pleroma, please enable JavaScript.</noscript>
+    <div id="splash" class="initial-hidden">
+      <!-- we are hiding entire graphic so no point showing credit -->
+      <div aria-hidden="true" id="splash-credit">
+        Art by pipivovott
+      </div>
+      <div id="splash-container">
+        <div aria-hidden="true" id="mascot-container">
+          <div id="throbber">
+            <div class="chunk" id="chunk-P">
+            </div>
+            <div class="chunk" id="chunk-L">
+            </div>
+            <div class="chunk" id="chunk-E">
+            </div>
+          </div>
+          <img id="mascot" src="/static/pleromatan_apology_small.webp">
+        </div>
+        <div id="status" class="css-ok">
+          <!-- (｡>﹏<) -->
+          <!-- it's a pseudographic, don't want screenreader read out nonsense -->
+          <span aria-hidden="true" class="initial-text">(｡&gt;﹏&lt;)</span>
+        </div>
+        <code id="statusError"></code>
+        <pre id="statusStack"></pre>
+      </div>
+    </div>
+    <div id="app" class="hidden"></div>
+    <div id="modal"></div>
+    <!-- built files will be auto injected -->
+    <div id="popovers"></div>
+  </body>
+</html>

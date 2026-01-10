@@ -7,6 +7,7 @@ defmodule Pleroma.Web.StreamerView do
 
   alias Pleroma.Activity
   alias Pleroma.Conversation.Participation
+  alias Pleroma.Marker
   alias Pleroma.Notification
   alias Pleroma.User
   alias Pleroma.Web.MastodonAPI.NotificationView
@@ -159,6 +160,19 @@ defmodule Pleroma.Web.StreamerView do
           participation: participation,
           for: participation.user
         })
+        |> Jason.encode!()
+    }
+    |> Jason.encode!()
+  end
+
+  def render("marker.json", %Marker{} = marker) do
+    %{
+      event: "marker",
+      payload:
+        Pleroma.Web.MastodonAPI.MarkerView.render(
+          "markers.json",
+          markers: [marker]
+        )
         |> Jason.encode!()
     }
     |> Jason.encode!()

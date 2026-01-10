@@ -3,13 +3,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 
 defmodule Pleroma.Workers.ReceiverWorkerTest do
-  use Pleroma.DataCase
+  use Pleroma.DataCase, async: true
   use Oban.Testing, repo: Pleroma.Repo
 
   import Mock
   import Pleroma.Factory
 
   alias Pleroma.User
+  alias Pleroma.Web.CommonAPI
   alias Pleroma.Web.Federator
   alias Pleroma.Workers.ReceiverWorker
 
@@ -242,5 +243,63 @@ defmodule Pleroma.Workers.ReceiverWorkerTest do
       })
 
     assert {:cancel, _} = ReceiverWorker.perform(oban_job)
+  end
+
+  describe "Server reachability:" do
+    setup do
+      user = insert(:user)
+      remote_user = insert(:user, local: false, ap_id: "https://example.com/users/remote")
+      {:ok, _, _} = Pleroma.User.follow(user, remote_user)
+      {:ok, activity} = CommonAPI.post(remote_user, %{status: "Test post"})
+
+      %{
+        user: user,
+        remote_user: remote_user,
+        activity: activity
+      }
+    end
+
+    test "schedules ReachabilityWorker if host is unreachable", %{activity: activity} do
+      with_mocks [
+        {Pleroma.Web.ActivityPub.Transmogrifier, [],
+         [handle_incoming: fn _ -> {:ok, activity} end]},
+        {Pleroma.Instances, [], [reachable?: fn _ -> false end]},
+        {Pleroma.Web.Federator, [], [perform: fn :incoming_ap_doc, _params -> {:ok, nil} end]}
+      ] do
+        job = %Oban.Job{
+          args: %{
+            "op" => "incoming_ap_doc",
+            "params" => activity.data
+          }
+        }
+
+        Pleroma.Workers.ReceiverWorker.perform(job)
+
+        assert_enqueued(
+          worker: Pleroma.Workers.ReachabilityWorker,
+          args: %{"domain" => "example.com"}
+        )
+      end
+    end
+
+    test "does not schedule ReachabilityWorker if host is reachable", %{activity: activity} do
+      with_mocks [
+        {Pleroma.Web.ActivityPub.Transmogrifier, [],
+         [handle_incoming: fn _ -> {:ok, activity} end]},
+        {Pleroma.Instances, [], [reachable?: fn _ -> true end]},
+        {Pleroma.Web.Federator, [], [perform: fn :incoming_ap_doc, _params -> {:ok, nil} end]}
+      ] do
+        job = %Oban.Job{
+          args: %{
+            "op" => "incoming_ap_doc",
+            "params" => activity.data
+          }
+        }
+
+        Pleroma.Workers.ReceiverWorker.perform(job)
+
+        refute_enqueued(worker: Pleroma.Workers.ReachabilityWorker)
+      end
+    end
   end
 end

@@ -193,7 +193,8 @@ defmodule Pleroma.UserRelationship do
           {[:mute], []}
 
         nil ->
-          {[:block, :mute, :notification_mute, :reblog_mute], [:block, :inverse_subscription]}
+          {[:block, :mute, :notification_mute, :reblog_mute, :endorsement],
+           [:block, :inverse_subscription]}
 
         unknown ->
           raise "Unsupported :subset option value: #{inspect(unknown)}"

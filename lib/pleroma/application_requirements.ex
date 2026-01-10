@@ -189,7 +189,40 @@ defmodule Pleroma.ApplicationRequirements do
         false
       end
 
-    if Enum.all?([preview_proxy_commands_status | filter_commands_statuses], & &1) do
+    language_detector_commands_status =
+      if Pleroma.Language.LanguageDetector.missing_dependencies() == [] do
+        true
+      else
+        Logger.error(
+          "The following dependencies required by the currently enabled " <>
+            "language detection provider are not installed: " <>
+            inspect(Pleroma.Language.LanguageDetector.missing_dependencies())
+        )
+
+        false
+      end
+
+    translation_commands_status =
+      if Pleroma.Language.Translation.missing_dependencies() == [] do
+        true
+      else
+        Logger.error(
+          "The following dependencies required by the currently enabled " <>
+            "translation provider are not installed: " <>
+            inspect(Pleroma.Language.Translation.missing_dependencies())
+        )
+
+        false
+      end
+
+    if Enum.all?(
+         [
+           preview_proxy_commands_status,
+           language_detector_commands_status,
+           translation_commands_status | filter_commands_statuses
+         ],
+         & &1
+       ) do
       :ok
     else
       {:error,

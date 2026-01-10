@@ -30,4 +30,9 @@ defmodule Pleroma.Web.MastodonAPI.InstanceController do
   def rules(conn, _params) do
     render(conn, "rules.json")
   end
+
+  @doc "GET /api/v1/instance/translation_languages"
+  def translation_languages(conn, _params) do
+    render(conn, "translation_languages.json")
+  end
 end

@@ -7,6 +7,7 @@ defmodule Pleroma.Web.ApiSpec.EmojiReactionOperation do
   alias OpenApiSpex.Schema
   alias Pleroma.Web.ApiSpec.Schemas.Account
   alias Pleroma.Web.ApiSpec.Schemas.ApiError
+  alias Pleroma.Web.ApiSpec.Schemas.ApiNotFoundError
   alias Pleroma.Web.ApiSpec.Schemas.FlakeID
   alias Pleroma.Web.ApiSpec.Schemas.Status
 
@@ -35,7 +36,8 @@ defmodule Pleroma.Web.ApiSpec.EmojiReactionOperation do
       security: [%{"oAuth" => ["read:statuses"]}],
       operationId: "EmojiReactionController.index",
       responses: %{
-        200 => array_of_reactions_response()
+        200 => array_of_reactions_response(),
+        404 => Operation.response("Access denied", "application/json", ApiNotFoundError)
       }
     }
   end
@@ -54,7 +56,8 @@ defmodule Pleroma.Web.ApiSpec.EmojiReactionOperation do
       operationId: "EmojiReactionController.create",
       responses: %{
         200 => Operation.response("Status", "application/json", Status),
-        400 => Operation.response("Bad Request", "application/json", ApiError)
+        400 => Operation.response("Bad Request", "application/json", ApiError),
+        404 => Operation.response("Not Found", "application/json", ApiNotFoundError)
       }
     }
   end

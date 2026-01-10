@@ -152,4 +152,70 @@ defmodule Pleroma.Web.MastodonAPI.InstanceControllerTest do
              }
            ] = result["rules"]
   end
+
+  test "translation languages matrix", %{conn: conn} do
+    clear_config([Pleroma.Language.Translation, :provider], TranslationMock)
+
+    assert %{"en" => ["pl"], "pl" => ["en"]} =
+             conn
+             |> get("/api/v1/instance/translation_languages")
+             |> json_response_and_validate_schema(200)
+  end
+
+  test "base_urls in pleroma metadata", %{conn: conn} do
+    media_proxy_base_url = "https://media.example.org"
+    upload_base_url = "https://uploads.example.org"
+
+    clear_config([:media_proxy, :enabled], true)
+    clear_config([:media_proxy, :base_url], media_proxy_base_url)
+    clear_config([Pleroma.Upload, :base_url], upload_base_url)
+
+    conn = get(conn, "/api/v1/instance")
+
+    assert result = json_response_and_validate_schema(conn, 200)
+    assert result["pleroma"]["metadata"]["base_urls"]["media_proxy"] == media_proxy_base_url
+    assert result["pleroma"]["metadata"]["base_urls"]["upload"] == upload_base_url
+
+    # Test when media_proxy is disabled
+    clear_config([:media_proxy, :enabled], false)
+
+    conn = get(conn, "/api/v1/instance")
+
+    assert result = json_response_and_validate_schema(conn, 200)
+    refute Map.has_key?(result["pleroma"]["metadata"]["base_urls"], "media_proxy")
+    assert result["pleroma"]["metadata"]["base_urls"]["upload"] == upload_base_url
+
+    # Test when upload base_url is not set
+    clear_config([Pleroma.Upload, :base_url], nil)
+
+    conn = get(conn, "/api/v1/instance")
+
+    assert result = json_response_and_validate_schema(conn, 200)
+    refute Map.has_key?(result["pleroma"]["metadata"]["base_urls"], "media_proxy")
+    refute Map.has_key?(result["pleroma"]["metadata"]["base_urls"], "upload")
+  end
+
+  test "display timeline access restrictions", %{conn: conn} do
+    clear_config([:restrict_unauthenticated, :timelines, :local], true)
+    clear_config([:restrict_unauthenticated, :timelines, :federated], false)
+
+    conn = get(conn, "/api/v2/instance")
+
+    assert result = json_response_and_validate_schema(conn, 200)
+
+    assert result["configuration"]["timelines_access"] == %{
+             "live_feeds" => %{
+               "local" => "authenticated",
+               "remote" => "public"
+             },
+             "hashtag_feeds" => %{
+               "local" => "authenticated",
+               "remote" => "public"
+             },
+             "trending_link_feeds" => %{
+               "local" => "disabled",
+               "remote" => "disabled"
+             }
+           }
+  end
 end

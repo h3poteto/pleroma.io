@@ -1,0 +1,31 @@
+#!/bin/ksh
+#
+# Default init file for Pleroma on OpenBSD
+#
+# Simple installation instructions:
+# 1. Install Pleroma per wiki instructions
+# 2. Place this pleroma file in /etc/rc.d
+# 3. Enable and start Pleroma
+#	# doas rcctl enable pleroma
+#	# doas rcctl start pleroma
+#
+
+daemon="/usr/local/bin/elixir"
+daemon_flags="--erl \"-detached\" -S /usr/local/bin/mix phx.server"
+daemon_user="_pleroma"
+daemon_execdir="/home/_pleroma/pleroma"
+
+. /etc/rc.d/rc.subr
+
+rc_reload=NO
+pexp="phx.server"
+
+rc_check() {
+	pgrep -q -U _pleroma -f "phx.server"
+}
+
+rc_stop() {
+	pkill -q -U _pleroma -f "phx.server"
+}
+
+rc_cmd $1

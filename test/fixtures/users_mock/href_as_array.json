@@ -1,0 +1,41 @@
+{
+  "alsoKnownAs": [],
+  "attachment": [],
+  "capabilities": {},
+  "discoverable": true,
+  "endpoints": {},
+  "featured": "https://queef.in/cute_cat/collections/featured",
+  "followers": "https://queef.in/cute_cat/followers",
+  "following": "https://queef.in/cute_cat/following",
+  "icon": {
+    "type": "Image",
+    "url": [
+	"https://queef.in/storage/profile.webp",
+	"https://example.com/image"
+    ]
+  },
+  "id": "https://queef.in/cute_cat",
+  "image": {
+    "type": "Image",
+    "url": [
+	"https://queef.in/storage/banner.gif",
+	"https://example.com/image"
+    ]
+  },
+  "inbox": "https://queef.in/cute_cat/inbox",
+  "manuallyApprovesFollowers": false,
+  "name": "cute_cat",
+  "outbox": "https://queef.in/cute_cat/outbox",
+  "preferredUsername": "cute_cat",
+  "publicKey": {
+    "id": "https://queef.in/cute_cat#main-key",
+    "owner": "https://queef.in/cute_cat"
+  },
+  "published": "2025-08-18T01:16:10.000Z",
+  "summary": "A cute cat",
+  "tag": [],
+  "type": "Person",
+  "url": "https://queef.in/cute_cat",
+  "vcard:bday": null,
+  "webfinger": "acct:cute_cat@queef.in"
+}
