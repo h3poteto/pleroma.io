@@ -36,12 +36,7 @@ defmodule Pleroma.Mixfile do
       releases: [
         pleroma: [
           include_executables_for: [:unix],
-          applications: [
-            ex_syslogger: :load,
-            syslog: :load,
-            eldap: :transient,
-            opentelemetry: :temporary
-          ],
+          applications: [ex_syslogger: :load, syslog: :load, eldap: :transient],
           steps: [:assemble, &copy_files/1, &copy_nginx_config/1],
           config_providers: [{Pleroma.Config.ReleaseRuntimeProvider, []}]
         ]
@@ -211,13 +206,6 @@ defmodule Pleroma.Mixfile do
       {:multipart, "~> 0.4.0", optional: true},
       {:argon2_elixir, "~> 4.0"},
 
-      # open telemetry
-      {:opentelemetry, "~> 1.5.0"},
-      {:opentelemetry_phoenix, "~> 1.2"},
-      {:opentelemetry_cowboy, "~> 0.3.0"},
-      {:opentelemetry_exporter, "~> 1.8.0"},
-      {:opentelemetry_ecto, "~> 1.2.0"},
-      {:opentelemetry_oban, "~> 1.1"},
       # telemetry
       {:telemetry_metrics_prometheus, "~> 1.0"},
 

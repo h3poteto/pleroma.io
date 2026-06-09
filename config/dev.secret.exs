@@ -44,6 +44,3 @@ config :pleroma, :mrf,
 config :pleroma, :mrf_hellthread,
   delist_threshold: 4,
   reject_threshold: 4
-
-# config :opentelemetry, traces_exporter: {:otel_exporter_stdout, []}
-config :opentelemetry, traces_exporter: :none

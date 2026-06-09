@@ -23,12 +23,6 @@ if config_env() == :prod do
     environment: "production",
     enable_crash_reports: true,
     enabled: true
-
-  config :opentelemetry, :processors,
-    otel_batch_processor: %{
-      exporter:
-        {:opentelemetry_exporter, %{endpoints: [System.fetch_env!("OTEL_EXPORTER_ENDPOINT")]}}
-    }
 end
 
 if System.get_env("REMOTE_POST_RETENTION_DAYS") do
