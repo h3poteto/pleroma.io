@@ -1,4 +1,4 @@
-FROM ghcr.io/h3poteto/pleroma:1.15.1-otp26-slim as builder
+FROM ghcr.io/h3poteto/pleroma:1.17.2-otp27-slim as builder
 
 USER root
 ENV APP_DIR /var/opt/app
@@ -18,7 +18,7 @@ RUN mkdir release && \
     mix release --path release
 
 
-FROM debian:bullseye-slim
+FROM debian:bookworm-slim
 
 RUN apt-get update -y && apt-get install -y --no-install-recommends \
     libstdc++6 \
