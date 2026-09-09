@@ -4,10 +4,6 @@ on:
   push:
     branches: [ "master" ]
 
-permissions:
-  id-token: write
-  contents: read
-
 env:
   ECR_PHOENIX: 564677439943.dkr.ecr.ap-northeast-1.amazonaws.com/h3poteto/pleroma/phoenix
   ECR_NGINX: 564677439943.dkr.ecr.ap-northeast-1.amazonaws.com/h3poteto/pleroma/nginx
@@ -16,10 +12,15 @@ jobs:
   build_phoenix:
     name: Phoenix docker build
     runs-on: ubuntu-latest
-
+    permissions:
+      id-token: write
+      contents: read
+    concurrency:
+      group: build-phoenix-${{ github.ref }}
+      cancel-in-progress: true
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
       - name: Setup Docker buildx
         uses: docker/setup-buildx-action@v2
       - name: Configure AWS Credentials
@@ -28,13 +29,13 @@ jobs:
           role-to-assume: arn:aws:iam::564677439943:role/github-actions-ecr
           aws-region: ap-northeast-1
       - name: Login to ECR
-        uses: docker/login-action@v2
+        uses: docker/login-action@v4
         with:
           registry: 564677439943.dkr.ecr.ap-northeast-1.amazonaws.com
 
       - name: Extract Docker metadata
         id: meta
-        uses: docker/metadata-action@v4
+        uses: docker/metadata-action@v6
         with:
           images: ${{ env.ECR_PHOENIX }}
           tags: |
@@ -43,7 +44,7 @@ jobs:
 
       - name: Build and push Docker image
         id: build-and-push
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: dockerfiles/phoenix/Dockerfile
@@ -54,7 +55,12 @@ jobs:
   build_nginx:
     name: Nginx docker build
     runs-on: ubuntu-latest
-
+    permissions:
+      id-token: write
+      contents: read
+    concurrency:
+      group: build-nginx-${{ github.ref }}
+      cancel-in-progress: true
 
     steps:
       - uses: actions/checkout@v3
@@ -96,13 +102,19 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
-      - name: Install hub
-        run: |
-          curl -sSLf https://github.com/github/hub/releases/download/v2.14.2/hub-linux-amd64-2.14.2.tgz | \
-          tar zxf - --strip-components=1 -C /tmp/ && \
-          sudo mv /tmp/bin/hub /usr/local/bin/hub
-          hub --version
+      - name: Generate token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.APP_ID }}
+          private-key: ${{ secrets.CREATE_APP_TOKEN_PRIVATE_KEY }}
+          owner: h3poteto
+          repositories: k8s-services
+      - uses: actions/checkout@v7
+        with:
+          repository: h3poteto/k8s-services
+          token: ${{ steps.app-token.outputs.token }}
+          path: k8s-services
       - name: Install kustomize
         run: |
           curl -sSLf https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv4.5.7/kustomize_v4.5.7_linux_amd64.tar.gz | \
@@ -110,14 +122,12 @@ jobs:
           sudo mv /tmp/kustomize /usr/local/bin/kustomize
           kustomize version
       - name: Update tag and create PR
+        working-directory: k8s-services
         env:
-          GITHUB_TOKEN: ${{ secrets.TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
-          git config --global user.name h3poteto
-          git config --global user.email ${{ secrets.EMAIL }}
-          git clone https://h3poteto:${{ secrets.TOKEN }}@github.com/h3poteto/k8s-services.git
-          cd k8s-services
-          git init
+          git config user.name "h3poteto-image-updater[bot]"
+          git config user.email "327019964+h3poteto-image-updater[bot]@users.noreply.github.com"
           git checkout -b update-pleromaio-image-${{ github.sha }}
           cd external/services/pleromaio
           kustomize edit set image "phoenix=${{ env.ECR_PHOENIX }}:sha-${{ github.sha }}"
@@ -125,4 +135,4 @@ jobs:
           git add .
           git commit -m "Update docker image for pleromaio to ${{ github.sha }}"
           git push --set-upstream origin update-pleromaio-image-${{ github.sha }}
-          hub pull-request -m "[Image update] pleromaio ${{ github.sha }}"
+          gh pr create --title "[Image update] pleromaio ${{ github.sha }}" --body ""
