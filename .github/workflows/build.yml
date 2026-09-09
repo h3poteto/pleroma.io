@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
 
     container:
-      image: ghcr.io/h3poteto/pleroma:1.15.1-otp26-slim
+      image: ghcr.io/h3poteto/pleroma:1.17.2-otp27-slim
       options: --user root
       env:
         MIX_ENV: test

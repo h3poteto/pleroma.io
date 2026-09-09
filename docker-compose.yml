@@ -1,7 +1,7 @@
 version: "3.0"
 services:
   elixir:
-    image: ghcr.io/h3poteto/pleroma:1.15.1-otp26-slim
+    image: ghcr.io/h3poteto/pleroma:1.17.2-otp27-slim
     user: root
     working_dir: /var/opt/app
     environment:
